@@ -1,0 +1,241 @@
+/* General Styles */
+.bspfy-label {
+    font-weight: bold;
+    margin-bottom: 5px;
+    display: block;
+}
+
+.bspfy-input {
+    width: 70%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-right: 10px;
+}
+
+.bspfy-button {
+    background-color: #1db954;
+    color: #fff;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.bspfy-button:hover {
+    background-color: #1aa34a;
+}
+
+/* Style container for the checkboxes */
+.bspfy-checkbox-group {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 10px;
+}
+
+/* Style for individual checkbox labels */
+.bspfy-checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    color: #333;
+    font-weight: 500;
+    position: relative;
+}
+
+/* Hide the actual checkbox input */
+.bspfy-checkbox-label input[type="checkbox"] {
+    appearance: none;
+    width: 0;
+    height: 0;
+    position: absolute;
+    z-index: -1;
+    overflow: hidden;
+}
+
+/* Custom checkbox style */
+.bspfy-checkbox-label span::before {
+    content: '';
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #0073aa; /* Primary border color */
+    border-radius: 4px;
+    margin-right: 8px;
+    background-color: white;
+    transition: background-color 0.2s, transform 0.2s, border-color 0.2s;
+}
+
+/* Checked state */
+.bspfy-checkbox-label input[type="checkbox"]:checked + span::before {
+    background-color: #0073aa; /* Fill color when checked */
+    border-color: #005885; /* Darker border for checked */
+    transform: scale(1.1);
+}
+
+/* Add a checkmark */
+.bspfy-checkbox-label input[type="checkbox"]:checked + span::after {
+    content: '✔'; /* Checkmark icon */
+    color: white;
+    position: absolute;
+    left: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: bold;
+}
+
+/* Hover effect */
+.bspfy-checkbox-label:hover span::before {
+    border-color: #005885;
+    box-shadow: 0 0 5px rgba(0, 115, 170, 0.5);
+}
+
+/* Checkbox label hover effect */
+.bspfy-checkbox-label:hover {
+    color: #005885;
+}
+
+
+
+/* Search Results Grid */
+.bspfy-track-grid {
+    display: grid;
+    grid-template-columns: 2fr ;
+    gap: 10px;
+    align-items: center;
+    border: 1px solid #ddd;
+    padding: 10px;
+    background: #f9f9f9;
+    border-radius: 4px;
+}
+
+.track-result {
+    display: grid;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    flex-direction: row;
+    align-content: center;
+    align-items: center;
+    grid-template-columns: 1fr 3fr 2fr;
+}
+.track-details {
+    display: flex
+;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-content: flex-start;
+    font-size: 1.1em;
+    line-height: 1;
+}
+.track-details-space {
+    padding: 2px;
+    margin-left: 10px;
+    clear: right;
+}
+.track-actions {
+    display: flex
+;
+    justify-content: space-evenly;
+    align-content: stretch;
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+    justify-items: end;
+    flex-wrap: wrap;
+    flex-direction: row;
+}
+
+.bspfy-track-grid img {
+    width: 60px;
+    height: 60px;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.bspfy-track-details span {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.bspfy-track-actions button {
+    margin-right: 10px;
+    background-color: #1db954;
+    color: #fff;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.bspfy-track-actions button:hover {
+    background-color: #1aa34a;
+}
+
+/* Playlist Tracks */
+.bspfy-track-list {
+    list-style: none;
+    padding: 0;
+}
+
+.bspfy-track-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ddd;
+    padding: 10px 0;
+}
+
+.bspfy-remove-button {
+    background-color: #d9534f;
+    color: #fff;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.bspfy-remove-button:hover {
+    background-color: #c9302c;
+}
+
+.track-actions-add-track-button, .track-actions-preview-button{
+    display: block;
+    width: 100px;
+    padding: 10px;
+    text-align: center;
+    background: limegreen;
+}
+.track-actions-add-track-button:hover, .track-actions-preview-button:hover{
+    background: darkgray;
+    /* font-weight: 500; */
+    padding: 10px;
+}
+.track-actions-preview-button {
+    cursor: alias;
+}
+.track-actions-add-track-button {
+    cursor: cell;
+    margin-top: 2px;
+}
+
+#audio-player, #track-preview-audio {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.bsfy-srch {
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+}

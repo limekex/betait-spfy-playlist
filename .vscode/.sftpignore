@@ -1,0 +1,15 @@
+# Ignorer .git-mappen
+.git/
+
+
+# Ignorer node_modules-mappen
+node_modules/
+
+# Ignorer alle loggfiler
+*.log
+
+.gitignore
+CHANGELOG.md
+README.md
+.sftpignore
+sftp.json
