@@ -2,3 +2,604 @@
  * All of the CSS for your public-facing functionality should be
  * included in this file.
  */
+
+ /* ===========================
+   Reset / Basic Setup
+   =========================== */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  
+  body {
+    font-family: Arial, sans-serif;
+    line-height: 1.4;
+  }
+  
+  /* Container */
+  .bspfy-container {
+    width: 90%;
+    max-width: 1200px;
+    margin: 0 auto;
+    /* Fallback for older browsers - vil legge inn flex inntil videre */
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* ===========================
+     Grid Layout
+     =========================== */
+  
+  /* 
+     Vi bruker @supports for å overstyre flex-fallback
+     dersom nettleseren støtter CSS grid.
+  */
+  @supports (display: grid) {
+    .bspfy-container {
+      display: grid;
+      grid-template-columns: 2fr 1fr; /* 2:1 for main / cover og player */
+      grid-template-rows: auto auto auto auto; /* tilpasses innhold */
+      grid-template-areas:
+        "header  header"
+        "main    cover"
+        "main    player"
+        "footer  footer";
+      gap: 1rem;
+      padding: 1rem;
+    }
+  
+    .bspfy-header {
+        grid-area: header;
+        /* background-color: #c8e6c9; /* Grønn-ish for demo */
+        /* padding: 1rem; */
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 1rem;
+    }
+    }
+  
+    .bspfy-main {
+      grid-area: main;
+      /* background-color: #bbdefb; /* Blålig bakgrunn for demo 
+      padding: 1rem;*/
+    }
+  
+    .bspfy-cover-section {
+      grid-area: cover;
+      /*background-color: #e1bee7; /* Lilla for demo 
+      padding: 1rem;*/
+    }
+  
+    .bspfy-player-section {
+        grid-area: player;
+        margin: 0;
+        padding: 0;
+        border: none;
+        background: none;
+        font: inherit;
+        color: inherit;
+        box-shadow: none;
+        text-align: inherit;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        margin: 0;
+        outline: none;
+        all:initial;
+    }
+  
+    .bspfy-footer {
+      grid-area: footer;
+      background-color: #fff9c4; /* Gul-ish for demo */
+      padding: 1rem;
+      text-align: center;
+    }
+  }
+  
+  /* ===========================
+     Flexbox Fallback Styles
+     =========================== */
+  
+  /*
+    Dersom browser ikke støtter grid, vil .bspfy-container 
+    ha display: flex; flex-direction: column; 
+    fra "grunnstilen" vi definerte. 
+  */
+  .bspfy-header,
+  .bspfy-main,
+  .bspfy-cover,
+  .bspfy-player,
+  .bspfy-footer {
+    margin: 1rem 0;
+    /*padding: 1rem;*/
+  }
+  
+  /* Her kan du tilpasse hvordan du vil 
+     at fallbacken i flex skal se ut videre */
+  .bspfy-player {
+    display: flex;
+    gap: 1rem;
+  }
+  
+  /* ===========================
+     Responsive Design
+     =========================== */
+  
+  /* 
+     På mobil (max-width ~ 767px) skjules cover (lilla) 
+     og player (rosa) flyttes over main (blå).
+  */
+  @media screen and (max-width: 767px) {
+    @supports (display: grid) {
+      /* Skjul cover */
+      .bspfy-cover {
+        display: none;
+      }
+      /* La spilleren komme før main i koden når grid brukes */
+      .bspfy-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto;
+        grid-template-areas:
+          "header"
+          "player"
+          "main"
+          "footer";
+      }
+    }
+  
+    /* Utenfor @supports, for flex fallback */
+    .bspfy-cover {
+      display: none;
+    }
+    .bspfy-player {
+      order: 1;
+    }
+    .bspfy-main {
+      order: 2;
+    }
+  }
+  
+
+  .bspfy-playlist-description {
+    font-size: 16px;
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+.bspfy-playlist-description p {
+    margin-bottom: 15px;
+}
+
+/* Playlist Grid */
+.bspfy-playlist-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+@media (min-width: 768px) {
+    .bspfy-playlist-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+}
+
+.bspfy-track-item {
+    background-color: rgba(255, 255, 255, 0.9) !important;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    aspect-ratio: 1/1;
+}
+
+.track-info {
+    margin-bottom: 10px;
+}
+
+.track-info strong {
+    font-size: 18px;
+}
+
+.track-info p {
+    font-size: 14px;
+    color: #666;
+}
+
+.track-actions {
+    display: flex;
+    justify-content: space-around;
+}
+
+.bspfy-action-icon,
+.bspfy-play-icon {
+    font-size: 25px;
+    color: #1db954;
+    text-align: center;
+    cursor: pointer;
+}
+
+.bspfy-action-icon:hover,
+.bspfy-play-icon:hover {
+    color: #1ed760;
+}
+
+/*.bspfy-play-icon i.fa-play {
+    display: inline;
+}
+
+.bspfy-play-icon i.fa-pause {
+    display: none;
+}
+
+.bspfy-playing .fa-play {
+    display: none;
+}
+
+.bspfy-playing .fa-pause {
+    display: inline;
+}*/
+
+.bspfy-play-icon {
+    cursor: pointer;
+    color: #1DB954;
+}
+
+.bspfy-play-icon.bspfy-playing i {
+    color: #f00;
+}
+#bspfy-now-playing-cover {
+    width: 100%;
+    max-width: 430px;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(255, 255, 255, 0.3);
+}
+
+
+/* Betait Spfy Playlist Player 1 Styles */
+
+
+
+
+#bspfy-pl1-player-container {
+    position: relative ;
+    top: 20%;
+    right: 0;
+    left: 0;
+    width: 430px;
+    height: 100px;
+    margin: -4px auto;
+  }
+  
+  #bspfy-pl1-player-bg-artwork {
+    position: fixed;
+    top: -30px;
+    right: -30px;
+    bottom: -30px;
+    left: -30px;
+    background-image: url("https://raw.githubusercontent.com/himalayasingh/music-player-1/master/img/_1.jpg");
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: 50%;
+    filter: blur(40px);
+    -webkit-filter: blur(40px);
+    z-index: 1;
+  }
+  
+  #bspfy-pl1-player-bg-layer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background-color: #fff;
+    opacity: 0.5;
+    z-index: 2;
+  }
+  
+  #bspfy-pl1-player {
+    position: relative;
+    height: 100%;
+    z-index: 3;
+  }
+  
+  #bspfy-pl1-player-track {
+    position: absolute;
+    top: 0;
+    right: 15px;
+    left: 15px;
+    padding: 13px 22px 10px 184px;
+    background-color: #fff7f7;
+    border-radius: 15px 15px 0 0;
+    transition: 0.3s ease top;
+    z-index: 1;
+  }
+  
+  #bspfy-pl1-player-track.bspfy-pl1-active {
+    top: -92px;
+  }
+  
+  #bspfy-pl1-track-name {
+    color: #54576f;
+    font-size: 17px;
+    font-weight: bold;
+  }
+  
+  #bspfy-pl1-album-name {
+    color: #acaebd;
+    font-size: 13px;
+    margin: 2px 0 13px 0;
+  }
+  
+  #bspfy-pl1-track-time {
+    height: 12px;
+    margin-bottom: 3px;
+    overflow: hidden;
+  }
+  
+  #bspfy-pl1-current-time {
+    float: left;
+  }
+  
+  #bspfy-pl1-track-length {
+    float: right;
+  }
+  
+  #bspfy-pl1-current-time,
+  #bspfy-pl1-track-length {
+    color: #000;
+    font-size: 11px;
+    background-color: #ffe8ee;
+    border-radius: 10px;
+    transition: 0.3s ease all;
+  }
+  
+  #bspfy-pl1-track-time.bspfy-pl1-active #bspfy-pl1-current-time,
+  #bspfy-pl1-track-time.bspfy-pl1-active #bspfy-pl1-track-length {
+    color: #f86d92;
+    background-color: transparent;
+  }
+  
+  #bspfy-pl1-seek-bar-container,
+  #bspfy-pl1-seek-bar {
+    position: relative;
+    height: 4px;
+    border-radius: 4px;
+  }
+  
+  #bspfy-pl1-seek-bar-container {
+    background-color: #ffe8ee;
+    cursor: pointer;
+  }
+  
+  #bspfy-pl1-seek-time {
+    position: absolute;
+    top: -29px;
+    color: #fff;
+    font-size: 12px;
+    white-space: pre;
+    padding: 5px 6px;
+    border-radius: 4px;
+    display: none;
+  }
+  
+  #bspfy-pl1-s-hover {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    opacity: 0.2;
+    z-index: 2;
+  }
+  
+  #bspfy-pl1-seek-time,
+  #bspfy-pl1-s-hover {
+    background-color: #3b3d50;
+  }
+  
+  #bspfy-pl1-seek-bar {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    background-color: #fd6d94;
+    transition: 0.2s ease width;
+    z-index: 1;
+  }
+  
+  #bspfy-pl1-player-content {
+    position: relative;
+    height: 100%;
+    background-color: #fff;
+    box-shadow: 0 30px 80px #656565;
+    border-radius: 15px;
+    z-index: 2;
+  }
+  
+  #bspfy-pl1-album-art {
+    position: absolute;
+    top: -40px;
+    width: 115px;
+    height: 115px;
+    margin-left: 40px;
+    transform: rotateZ(0);
+    transition: 0.3s ease all;
+    box-shadow: 0 0 0 10px #fff;
+    border-radius: 50%;
+    overflow: hidden;
+  }
+  
+  #bspfy-pl1-album-art.bspfy-pl1-active {
+    top: -60px;
+    box-shadow: 0 0 0 4px #fff7f7, 0 30px 50px -15px #afb7c1;
+  }
+  
+  #bspfy-pl1-album-art:before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 0;
+    left: 0;
+    width: 20px;
+    height: 20px;
+    margin: -10px auto 0 auto;
+    background-color: #d6dee7;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 2px #fff;
+    z-index: 2;
+  }
+  
+  #bspfy-pl1-album-art img {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    z-index: -1;
+  }
+  
+  #bspfy-pl1-album-art img.bspfy-pl1-active {
+    opacity: 1;
+    z-index: 1;
+  }
+  
+  #bspfy-pl1-album-art.bspfy-pl1-active img.bspfy-pl1-active {
+    z-index: 1;
+    animation: rotateAlbumArt 3s linear 0s infinite forwards;
+  }
+  
+  @keyframes rotateAlbumArt {
+    0% {
+      transform: rotateZ(0);
+    }
+    100% {
+      transform: rotateZ(360deg);
+    }
+  }
+  
+  #bspfy-pl1-buffer-box {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    left: 0;
+    height: 13px;
+    color: #1f1f1f;
+    font-size: 13px;
+    font-family: Helvetica;
+    text-align: center;
+    font-weight: bold;
+    line-height: 1;
+    padding: 6px;
+    margin: -12px auto 0 auto;
+    background-color: rgba(255, 255, 255, 0.19);
+    opacity: 0;
+    z-index: 2;
+  }
+  
+  #bspfy-pl1-album-art img,
+  #bspfy-pl1-buffer-box {
+    transition: 0.1s linear all;
+  }
+  
+  #bspfy-pl1-album-art.buffering img {
+    opacity: 0.25;
+  }
+  
+  #bspfy-pl1-album-art.buffering img.bspfy-pl1-active {
+    opacity: 0.8;
+    filter: blur(2px);
+    -webkit-filter: blur(2px);
+  }
+  
+  #bspfy-pl1-album-art.buffering #bspfy-pl1-buffer-box {
+    opacity: 1;
+  }
+  
+  #bspfy-pl1-player-controls {
+    width: 250px;
+    height: 100%;
+    margin: 0 5px 0 141px;
+    float: right;
+    overflow: hidden;
+  }
+  
+  .bspfy-pl1-control {
+    width: 33.333%;
+    float: left;
+    padding: 12px 0;
+  }
+  
+  .bspfy-pl1-button {
+    /*width: 26px;*/
+    /*height: 26px;*/
+    padding: 25px;
+    background-color: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  
+  .bspfy-pl1-button i {
+    display: block;
+    color: #d6dee7;
+    font-size: 26px;
+    text-align: center;
+    line-height: 1;
+  }
+  
+  .bspfy-pl1-button,
+  .bspfy-pl1-button i {
+    transition: 0.2s ease all;
+  }
+  
+  .bspfy-pl1-button:hover {
+    background-color: #d6d6de;
+  }
+  
+  .bspfy-pl1-button:hover i {
+    color: #fff;
+  }
+  
+#bspfy-pl1-seek-bar { pointer-events: none; }
+#bspfy-pl1-s-hover  { pointer-events: none; }
+#bspfy-pl1-seek-time { pointer-events: none; } /* tooltip itself shouldn’t block */
+
+
+/* Én linje med ellipsis som default */
+.bspfy-one-line {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;          /* viktig i flex/grid */
+}
+
+/* Grid: tittel/album på én linje */
+.bspfy-track-item .track-info > * {
+  max-width: 100%;
+}
+
+/* Spiller: sikre at feltene får ellipsis */
+#bspfy-pl1-album-name,
+#bspfy-pl1-track-name {
+  max-width: 100%;
+}
+
+/* Scroll-container (brukes av JS) */
+.bspfy-scroll {
+  position: relative;
+  overflow: hidden;
+}
+.bspfy-scroll-inner {
+  display: inline-block;
+  will-change: transform;
+  padding-right: 48px; /* litt luft på slutten */
+}

@@ -156,9 +156,26 @@ public function render_meta_box_content( $post ) {
     echo '<input type="text" id="playlist_tracks_search" class="bspfy-input" placeholder="' . __( 'Enter track name or artist...', 'betait-spfy-playlist' ) . '">';
     echo '<button type="button" id="search_tracks_button" class="bspfy-button">' . __( 'Search', 'betait-spfy-playlist' ) . '</button>';
     echo '</div>';
+    $current_user_id = get_current_user_id();
+    $spotify_access_token = $current_user_id ? get_user_meta($current_user_id, 'spotify_access_token', true) : '';
+    $spotify_user_name = '';
+    
+    if ($spotify_access_token) {
+        $spotify_user_name = get_user_meta($current_user_id, 'spotify_user_name', true);
+    }
+    
     echo '<div class="oauth-container">';
-    echo '<div id="spotify-auth-button" class="bspfy-button">' . __( 'Authenticate with Spotify', 'betait-spfy-playlist' ) . '</div>';
+    if ($spotify_access_token) {
+        $auth_message = sprintf(
+            __( 'Authenticated as %s', 'betait-spfy-playlist' ),
+            esc_html($spotify_user_name ?: __( 'Unknown User', 'betait-spfy-playlist' ))
+        );
+        echo '<div id="spotify-auth-status" class="bspfy-authenticated">' . $auth_message . '</div>';
+    } else {
+        echo '<div id="spotify-auth-button" class="bspfy-button"><span class="btspfy-button-text">' . __( 'Authenticate with Spotify', 'betait-spfy-playlist' ) . '<span class="btspfy-button-icon-divider btspfy-button-icon-divider-right"><i class="fa-spotify fab" aria-hidden="true"></i></span></div>';
+    }
     echo '</div></div>';
+    
 
     // Checkboxes for search filters.
     echo '<div class="bspfy-checkbox-group" style="margin-bottom: 10px;">';
@@ -189,26 +206,43 @@ public function render_meta_box_content( $post ) {
     // Feedback container for search results.
     echo '<div id="track_search_results" class="bspfy-track-grid"></div>';
 
-    // Display current playlist tracks.
-    echo '<h4 class="bspfy-heading">' . __( 'Playlist Tracks', 'betait-spfy-playlist' ) . '</h4>';
-    echo '<ul id="playlist_tracks_list" class="bspfy-track-list">';
-    if ( $tracks ) {
-        foreach ( $tracks as $track ) {
-            echo '<li class="bspfy-track-item">';
-            echo '<div class="bspfy-track-details">';
-            echo '<span class="bspfy-track-artist">' . esc_html( $track['artist'] ) . '</span>';
-            echo '<span class="bspfy-track-album">(' . esc_html( $track['album'] ) . ')</span>';
-            echo '<span class="bspfy-track-name">- ' . esc_html( $track['name'] ) . '</span>';
-            echo '</div>';
-            echo '<button type="button" class="bspfy-remove-button" data-track-id="' . esc_attr( $track['id'] ) . '">' . __( 'Remove', 'betait-spfy-playlist' ) . '</button>';
-            echo '</li>';
-        }
-        $this->log_debug( 'Rendered ' . count( $tracks ) . ' tracks for post ID: ' . $post->ID );
-    } else {
-        echo '<li>' . __( 'No tracks added yet.', 'betait-spfy-playlist' ) . '</li>';
-        $this->log_debug( 'No tracks to render for post ID: ' . $post->ID );
+// Display current playlist tracks.
+echo '<h3 class="bspfy-heading">' . __( 'Playlist Tracks', 'betait-spfy-playlist' ) . '</h3>';
+echo '<div id="playlist_tracks_list" class="bspfy-track-list">';
+
+if ( $tracks ) {
+    foreach ( $tracks as $track ) {
+        // Extract relevant details.
+        $artist_name = isset( $track['artists'][0]['name'] ) ? $track['artists'][0]['name'] : __( 'Unknown Artist', 'betait-spfy-playlist' );
+        $album_name = isset( $track['album']['name'] ) ? $track['album']['name'] : __( 'Unknown Album', 'betait-spfy-playlist' );
+        $track_name = isset( $track['name'] ) ? $track['name'] : __( 'Unknown Track', 'betait-spfy-playlist' );
+        $track_uri = isset( $track['uri'] ) ? $track['uri'] : '';
+
+        // Render the track item.
+        echo '<div class="bspfy-track-item">';
+        echo '<img src="' . esc_url( $track['album']['images'][0]['url'] ?? '' ) . '" alt="' . esc_attr( $album_name ) . '">';
+        echo '<div class="track-details">';
+        echo '<div class="track-details-artist track-details-space"><strong>Artist:</strong> ' . esc_html( $artist_name ) . '</div>';
+        echo '<div class="track-details-album track-details-space"><strong>Album:</strong> ' . esc_html( $album_name ) . '</div>';
+        echo '<div class="track-details-tracktitle track-details-space"><strong>Track:</strong> ' . esc_html( $track_name ) . '</div>';
+        echo '</div>';
+        echo '<div class="track-actions">';
+        echo '<div class="track-actions-preview-button" data-uri="' . esc_attr( $track_uri ) . '">Play</div>';
+        echo '<button type="button" class="bspfy-remove-button" data-track-id="' . esc_attr( $track['id'] ) . '">' . __( 'Remove', 'betait-spfy-playlist' ) . '</button>';
+        echo '</div>';
+        echo '</div>';
     }
-    echo '</ul>';
+
+    $this->log_debug( 'Rendered ' . count( $tracks ) . ' tracks for post ID: ' . $post->ID );
+} else {
+    echo '<div>' . __( 'No tracks added yet.', 'betait-spfy-playlist' ) . '</div>';
+    $this->log_debug( 'No tracks to render for post ID: ' . $post->ID );
+}
+
+echo '</div>';
+
+
+
 
     // Hidden field to store selected tracks.
     echo '<input type="hidden" id="playlist_tracks" name="playlist_tracks" value="' . esc_attr( json_encode( $tracks ) ) . '">';

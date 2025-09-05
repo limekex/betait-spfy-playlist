@@ -220,30 +220,32 @@
             });
         }
 
-        // Function to Add Track to Playlist
         function addTrackToPlaylist(track) {
             const playlistTracksInput = document.getElementById('playlist_tracks');
             const currentTracks = JSON.parse(playlistTracksInput.value || '[]');
             currentTracks.push(track);
             playlistTracksInput.value = JSON.stringify(currentTracks);
-
+        
             const playlistList = document.getElementById('playlist_tracks_list');
-            const trackItem = document.createElement('div');
+            const trackItem = document.createElement('li');
             trackItem.classList.add('bspfy-track-item', 'bspfy-new-track');
+        
             trackItem.innerHTML = `
-            <img src="${track.album.images[0]?.url || ''}" alt="${track.album.name}">
-            <div class="track-details">
-            <div class="track-details-artist track-details-space"><strong>Artist:</strong> ${track.artists[0].name}</div>
-            <div class="track-details-album track-details-space"><strong>Album:</strong> ${track.album.name}</div>
-            <div class="track-details-tracktitle track-details-space"><strong>Track:</strong> ${track.name}</div>
-            </div>
-            <div class="track-actions">
-                <div class="track-actions-preview-button" data-uri="${track.uri}">Play</div>
-                <button type="button" class="bspfy-remove-button" data-track-id="${track.id}">Remove</button>
-            </div>
+                <img src="${track.album.images[0]?.url || ''}" alt="${track.album.name}">
+                <div class="track-details">
+                    <div class="track-details-artist track-details-space"><strong>Artist:</strong> ${track.artists[0].name}</div>
+                    <div class="track-details-album track-details-space"><strong>Album:</strong> ${track.album.name}</div>
+                    <div class="track-details-tracktitle track-details-space"><strong>Track:</strong> ${track.name}</div>
+                </div>
+                <div class="track-actions">
+                    <div class="track-actions-preview-button" data-uri="${track.uri}">Play</div>
+                    <button type="button" class="bspfy-remove-button" data-track-id="${track.id}">Remove</button>
+                </div>
             `;
+        
             playlistList.appendChild(trackItem);
-            
+        
+            // Play button event listener.
             trackItem.querySelector('.track-actions-preview-button').addEventListener('click', function () {
                 const trackUri = this.getAttribute('data-uri');
                 if (trackUri) {
@@ -253,6 +255,8 @@
                     alert('No track URI available.');
                 }
             });
+        
+            // Remove button event listener.
             trackItem.querySelector('.bspfy-remove-button').addEventListener('click', function () {
                 const trackId = this.getAttribute('data-track-id');
                 const updatedTracks = currentTracks.filter(t => t.id !== trackId);
@@ -260,6 +264,7 @@
                 trackItem.remove();
             });
         }
+        
         document.addEventListener('click', function (event) {
             if (event.target.classList.contains('bspfy-remove-button')) {
                 const trackId = event.target.getAttribute('data-track-id');
@@ -277,8 +282,6 @@
                 }
             }
         });
-
-
         
 
         const authButton = document.getElementById('spotify-auth-button');
@@ -390,23 +393,6 @@
                             window.location.href = '/';
                         }
                     }
-                    function attachPlayListenersToSavedTracks() {
-                        const savedTrackButtons = document.querySelectorAll('.bspfy-track-item .track-actions-preview-button');
-                        
-                        savedTrackButtons.forEach(button => {
-                            button.addEventListener('click', function () {
-                                const trackUri = this.getAttribute('data-uri');
-                                if (trackUri) {
-                                    playTrack(trackUri);
-                                    togglePlayButton(this);
-                                } else {
-                                    alert('No track URI available.');
-                                }
-                            });
-                        });
-                    }
-                
-                    // Call the function to attach listeners
-                    attachPlayListenersToSavedTracks();            
+                    
     });
 })(jQuery);

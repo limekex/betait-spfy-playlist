@@ -118,6 +118,8 @@ class Betait_Spfy_Playlist {
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-betait-spfy-playlist-api-handler.php';
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-betait-spfy-playlist-cpt.php';
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-betait-spfy-playlist-ajax.php';
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-betait-spfy-playlist-oauth.php';
+
 
 
 		/**
@@ -179,6 +181,9 @@ class Betait_Spfy_Playlist {
 		$plugin_admin = new Betait_Spfy_Playlist_Admin( $this->get_betait_spfy_playlist(), $this->get_version() );
 		$plugin_cpt = new Betait_Spfy_Playlist_CPT();
 		$plugin_ajax = new Betait_Spfy_Playlist_Ajax();
+		//$plugin_oauth = new Betait_Spfy_OAuth();
+		$this->oauth = new Betait_Spfy_Playlist_OAuth();
+
 	
 		// Enqueue admin styles and scripts.
 		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_styles' );

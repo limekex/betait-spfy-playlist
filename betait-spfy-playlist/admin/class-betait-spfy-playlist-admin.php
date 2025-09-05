@@ -62,6 +62,7 @@ class Betait_Spfy_Playlist_Admin {
 	public function enqueue_styles() {
 
 		wp_enqueue_style( $this->betait_spfy_playlist, plugin_dir_url( __FILE__ ) . 'css/betait-spfy-playlist-admin.css', array(), $this->version, 'all' );
+        wp_enqueue_style( 'font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css', array(), '6.5.0', 'all' );
 
 	}
 
@@ -90,6 +91,8 @@ public function enqueue_scripts() {
             'ajaxurl' => admin_url( 'admin-ajax.php' ), // Add AJAX URL for WordPress.
         )
     );
+
+    wp_enqueue_script('spotify-sdk', 'https://sdk.scdn.co/spotify-player.js', array(), null, true);
 }
 
 

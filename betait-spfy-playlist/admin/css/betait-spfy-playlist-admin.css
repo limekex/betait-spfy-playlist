@@ -14,17 +14,70 @@
 }
 
 .bspfy-button {
-    background-color: #1db954;
-    color: #fff;
+    background-color: #1ed760;
+    font-family:'MS Sans Serif';
+    font-style:normal;
+    font-weight:400;
+    color: #121212;
     padding: 10px 15px;
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    transition: background-color 0.3s;
+    transition: background-color 0.5s;
+    padding-top: var(--button_padding-top, 13px);
+    padding-right: var(--button_padding-right, 29px);
+    padding-bottom: var(--button_padding-bottom, 13px);
+    padding-left: var(--button_padding-left, 29px);
+    line-height: var(--button_line_height, 1);
+    font-size: var(--button_font_size, 14px);
+    --button_margin-top: 0px;
+    --button_margin-right: 0px;
+    --button_margin-bottom: 0px;
+    --button_margin-left: 0px;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    text-decoration: none;
+    cursor: pointer;
+    box-sizing: border-box;
+    font-family: var(--button_typography-font-family);
+    font-weight: var(--button_typography-font-weight);
+    font-style: var(--button_typography-font-style, normal);
+    letter-spacing: var(--button_typography-letter-spacing);
+    border-width: var(--button_border_width-top, 0) var(--button_border_width-right, 0) var(--button_border_width-bottom, 0) var(--button_border_width-left, 0);
+    border-style: solid;
+    border-radius: var(--button-border-radius-top-left, 0) var(--button-border-radius-top-right, 0) var(--button-border-radius-bottom-right, 0) var(--button-border-radius-bottom-left, 0);
+    text-transform: var(--button_text_transform);
+    transition: all .2s;
+    margin: var(--button_margin-top) var(--button_margin-right) var(--button_margin-bottom) var(--button_margin-left);
+}
+
+.btspfy-button-icon-divider {
+    margin: 0;
+    padding: 0;
+    width: calc(var(--button_padding-left, 29px) + var(--button_font_size, 14px));
+    transition: all .2s;
+}
+.btspfy-button-text {
+    display: inline-block;
+    margin-right: calc(var(--button_padding-right, 29px) / 2 + var(--button_font_size, 14px) + 1px);
+    text-transform: uppercase;
+}
+
+.btspfy-button-icon-divider-right {
+    right: 0;
+    border-left: 1px solid;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 0;
+    height: 100%;
 }
 
 .bspfy-button:hover {
-    background-color: #1aa34a;
+    background-color: #1ed75f3f;
 }
 
 /* Style container for the checkboxes */
@@ -103,9 +156,9 @@
 
 
 /* Search Results Grid */
-.bspfy-track-grid {
+.bspfy-track-grid, .bspfy-track-list {
     display: grid;
-    grid-template-columns: 2fr ;
+    grid-template-columns: 1fr ;
     gap: 10px;
     align-items: center;
     border: 1px solid #ddd;
@@ -121,7 +174,7 @@
     flex-direction: row;
     align-content: center;
     align-items: center;
-    grid-template-columns: 1fr 3fr 2fr;
+    grid-template-columns: 0.5fr 4fr 1.5fr;
 }
 .track-details {
     display: flex
@@ -139,8 +192,7 @@
     clear: right;
 }
 .track-actions {
-    display: flex
-;
+    display: flex;
     justify-content: space-evenly;
     align-content: stretch;
     grid-template-columns: 1fr 1fr;
@@ -150,7 +202,7 @@
     flex-direction: row;
 }
 
-.bspfy-track-grid img {
+.bspfy-track-grid img, .bspfy-track-list img {
     width: 60px;
     height: 60px;
     border-radius: 4px;
@@ -164,7 +216,7 @@
 
 .bspfy-track-actions button {
     margin-right: 10px;
-    background-color: #1db954;
+    background-color: #1ed760;
     color: #fff;
     border: none;
     padding: 8px 12px;
@@ -174,21 +226,19 @@
 }
 
 .bspfy-track-actions button:hover {
-    background-color: #1aa34a;
+    background-color: #1ed760;
 }
 
-/* Playlist Tracks */
-.bspfy-track-list {
-    list-style: none;
-    padding: 0;
-}
+
 
 .bspfy-track-item {
-    display: flex;
+    display: grid;
     justify-content: space-between;
+    flex-wrap: wrap;
+    flex-direction: row;
+    align-content: center;
     align-items: center;
-    border-bottom: 1px solid #ddd;
-    padding: 10px 0;
+    grid-template-columns: 0.5fr 4fr 1.5fr;
 }
 
 .bspfy-remove-button {
@@ -196,8 +246,8 @@
     color: #fff;
     padding: 5px 10px;
     border: none;
-    border-radius: 4px;
     cursor: pointer;
+    width: 100px;
 }
 
 .bspfy-remove-button:hover {
@@ -209,19 +259,18 @@
     width: 100px;
     padding: 10px;
     text-align: center;
-    background: limegreen;
+    background: #1ed760;
+    margin-top: 2px;
 }
 .track-actions-add-track-button:hover, .track-actions-preview-button:hover{
     background: darkgray;
     /* font-weight: 500; */
-    padding: 10px;
 }
 .track-actions-preview-button {
     cursor: alias;
 }
 .track-actions-add-track-button {
     cursor: cell;
-    margin-top: 2px;
 }
 
 #audio-player, #track-preview-audio {
@@ -237,5 +286,62 @@
 
 .bsfy-srch {
     display: grid;
-    grid-template-columns: 3fr 1fr;
+    grid-template-columns: 3fr 1.5fr;
+}
+
+.bspfy-new-track {
+    background-color: #f0f8ff;
+    border: 1px solid #0073aa;
+    border-radius: 5px;
+    padding: 5px 0px 5px 5px;
+    margin-bottom: 10px;
+}
+
+.bspfy-track-item.bspfy-new-track:after {
+    content: 'New';
+    position: absolute;
+    right: 8px;
+    display: inline-block;
+    background: #fff;
+    padding: 1px 3px;
+    border: red solid 1px;
+    font-weight: 700;
+    font-style: italic;
+    font-size: 12px;
+}
+
+.bspfy-authenticated {
+    background-color: #1db954;
+    color: #fff;
+    padding: 15px;
+    border-radius: 5px;
+    text-align: center;
+    width: 100%;
+    cursor: unset;
+}
+
+.bspfy-button:hover {
+    background-color: #1db954;
+    color: #fff;
+}
+
+.bspfy-spotify-attribution {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 20px;
+    padding: 10px 0;
+    border-top: 1px solid #ddd;
+    font-size: 14px;
+    color: #333;
+}
+
+.bspfy-spotify-attribution span {
+    margin-right: 10px;
+}
+
+.bspfy-spotify-logo {
+    height: 20px;
+    width: auto;
+    display: inline-block;
 }

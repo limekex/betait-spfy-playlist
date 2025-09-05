@@ -61,7 +61,7 @@ log_debug( 'Spotify Auth Redirect template loaded.' );
         localStorage.removeItem('spotifyRedirectBack');
         setTimeout(() => {
             window.location.href = redirectUrl;
-        }, 1000); // Delay for visibility
+        }, 10000); // Delay for visibility
     } else {
         // Log error and redirect to home if no token is found.
         logDebug('No access token found in URL fragment.');

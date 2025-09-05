@@ -51,6 +51,9 @@ class Betait_Spfy_Playlist_Public {
 
 		$this->betait_spfy_playlist = $betait_spfy_playlist;
 		$this->version = $version;
+		
+		// Hook to include our custom template.
+		add_filter( 'template_include', array( $this, 'load_playlist_template' ) );
 
 	}
 
@@ -74,7 +77,7 @@ class Betait_Spfy_Playlist_Public {
 		 */
 
 		wp_enqueue_style( $this->betait_spfy_playlist, plugin_dir_url( __FILE__ ) . 'css/betait-spfy-playlist-public.css', array(), $this->version, 'all' );
-
+		wp_enqueue_style( 'font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css', array(), '6.5.0', 'all' );
 	}
 
 	/**
@@ -96,8 +99,26 @@ class Betait_Spfy_Playlist_Public {
 		 * class.
 		 */
 
-		wp_enqueue_script( $this->betait_spfy_playlist, plugin_dir_url( __FILE__ ) . 'js/betait-spfy-playlist-public.js', array( 'jquery' ), $this->version, false );
-
+		 wp_enqueue_script('spotify-sdk', 'https://sdk.scdn.co/spotify-player.js', array(), null, true);
+		 wp_enqueue_script( $this->betait_spfy_playlist, plugin_dir_url( __FILE__ ) . 'js/betait-spfy-playlist-public.js', array( 'jquery' ), $this->version, false );
+		// wp_enqueue_script( $this->betait_spfy_playlist . '-player1', plugin_dir_url( __FILE__ ) . 'js/betait-spfy-player1.js', array( 'jquery' ), $this->version, false );
 	}
+
+
+		/**
+		 * Load the custom template for the playlist post type.
+		 *
+		 * @param string $template The path to the template to be loaded.
+		 * @return string The modified template path.
+		 */
+		public function load_playlist_template( $template ) {
+			if ( is_singular( 'playlist' ) ) {
+				$custom_template = plugin_dir_path( __FILE__ ) . '../templates/playlist-template.php';
+				if ( file_exists( $custom_template ) ) {
+					return $custom_template;
+				}
+			}
+			return $template;
+		}
 
 }

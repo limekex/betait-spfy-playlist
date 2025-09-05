@@ -68,7 +68,7 @@ class Betait_Spfy_Playlist_CPT {
             'label'               => __( 'Playlists', 'betait-spfy-playlist' ),
             'description'         => __( 'Custom Post Type for Spotify Playlists', 'betait-spfy-playlist' ),
             'labels'              => $labels,
-            'supports'            => array( 'title', 'thumbnail' ),
+            'supports'            => array( 'title', 'thumbnail', 'custom-fields' ),
             'taxonomies'          => array( 'genre' ),
             'public'              => true,
             'show_in_menu'        => 'betait-spfy-playlist',
@@ -109,7 +109,17 @@ class Betait_Spfy_Playlist_CPT {
      * @since    1.0.0
      */
     public function add_meta_boxes() {
-        // Tracks meta box.
+        
+        add_meta_box(
+            'playlist_description',
+            __( 'Playlist Description', 'betait-spfy-playlist' ),
+            array( $this, 'render_playlist_description_metabox' ),
+            'playlist',
+            'normal',
+            'high'
+        );
+        $this->log_debug( 'Meta box for despription added successfully.' );
+        
         add_meta_box(
             'playlist_tracks_meta_box',
             __( 'Tracks', 'betait-spfy-playlist' ),
@@ -118,27 +128,11 @@ class Betait_Spfy_Playlist_CPT {
             'normal',
             'core'
         );
+        $this->log_debug( 'Meta box for Tracks added successfully.' );
 
-        // Description meta box (WYSIWYG editor).
-        add_meta_box(
-            'playlist_description_meta_box',
-            __( 'Playlist Description', 'betait-spfy-playlist' ),
-            array( $this, 'render_description_meta_box' ),
-            'playlist',
-            'normal',
-            'high'
-        );
-
-        $this->log_debug( 'Meta boxes added successfully.' );
     }
 
- /**
-     * Render the content of the description meta box.
-     *
-     * @since    1.0.0
-     * @param    WP_Post $post The post object.
-     */
-    public function render_description_meta_box( $post ) {
+    public function render_playlist_description_metabox( $post ) {
         wp_nonce_field( 'save_playlist_description_meta', 'playlist_description_nonce' );
         $description = get_post_meta( $post->ID, '_playlist_description', true );
 
@@ -146,10 +140,32 @@ class Betait_Spfy_Playlist_CPT {
             'textarea_name' => 'playlist_description',
             'media_buttons' => false,
             'textarea_rows' => 10,
-        ));
+        ) );
     }
 
     /**
+     * Save the playlist description meta.
+     */
+    public function save_playlist_description_meta( $post_id ) {
+        if ( ! isset( $_POST['playlist_description_nonce'] ) ||
+             ! wp_verify_nonce( $_POST['playlist_description_nonce'], 'save_playlist_description_meta' ) ) {
+            return;
+        }
+
+        if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+            return;
+        }
+
+        if ( ! current_user_can( 'edit_post', $post_id ) ) {
+            return;
+        }
+
+        if ( isset( $_POST['playlist_description'] ) ) {
+            update_post_meta( $post_id, '_playlist_description', sanitize_textarea_field( $_POST['playlist_description'] ) );
+        }
+    }
+
+/**
  * Render the content of the Tracks meta box.
  *
  * @since    1.0.0
@@ -299,26 +315,26 @@ echo '</div>';
     public function save_playlist_meta( $post_id ) {
         $this->log_debug( 'Saving playlist metadata for post ID: ' . $post_id );
 
+        // Check if nonce is set and valid.
         if ( ! isset( $_POST['playlist_nonce'] ) || ! wp_verify_nonce( $_POST['playlist_nonce'], 'save_playlist_meta' ) ) {
             $this->log_debug( 'Nonce verification failed for post ID: ' . $post_id );
             return;
         }
 
+        // Check if the user has permission to save.
         if ( ! current_user_can( 'edit_post', $post_id ) ) {
             $this->log_debug( 'User lacks permission to edit post ID: ' . $post_id );
             return;
         }
 
+        // Save the tracks.
         if ( isset( $_POST['playlist_tracks'] ) ) {
             $tracks = sanitize_textarea_field( $_POST['playlist_tracks'] );
             update_post_meta( $post_id, '_playlist_tracks', $tracks );
             $this->log_debug( 'Tracks saved successfully for post ID: ' . $post_id );
-        }
-
-        if ( isset( $_POST['playlist_description'] ) ) {
-            $description = sanitize_textarea_field( $_POST['playlist_description'] );
-            update_post_meta( $post_id, '_playlist_description', $description );
-            $this->log_debug( 'Description saved successfully for post ID: ' . $post_id );
+        } else {
+            $this->log_debug( 'No tracks data to save for post ID: ' . $post_id );
         }
     }
+
 }
