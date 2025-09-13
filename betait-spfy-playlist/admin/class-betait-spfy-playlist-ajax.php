@@ -27,6 +27,7 @@ class Betait_Spfy_Playlist_Ajax {
     public function __construct() {
         add_action( 'wp_ajax_search_spotify_tracks', array( $this, 'search_spotify_tracks' ) );
         add_action( 'wp_ajax_save_spotify_access_token', array( $this, 'save_spotify_access_token' ) );
+        add_action( 'wp_ajax_save_spotify_user_name', array( $this, 'save_spotify_user_name' ) );
     }
 
     /**
@@ -46,59 +47,51 @@ class Betait_Spfy_Playlist_Ajax {
      *
      * @since    1.0.0
      */
-    public function search_spotify_tracks() {
-        $this->log_debug('Incoming AJAX request: ' . print_r($_POST, true));
-    
-        // Sjekk for tilgangstoken i headeren
-        $headers = getallheaders();
-        if (isset($headers['Authorization']) && preg_match('/Bearer\s(\S+)/', $headers['Authorization'], $matches)) {
-            $access_token = sanitize_text_field($matches[1]);
-        } else {
-            $this->log_debug('No access token provided in Authorization header.');
-            wp_send_json_error(array(
-                'message' => __('Access token is required for this request.', 'betait-spfy-playlist'),
-            ));
-            return;
+        public function search_spotify_tracks() {
+            $this->log_debug('Incoming AJAX request: ' . print_r($_POST, true));
+
+            // Bearer fra header
+            $headers = function_exists('getallheaders') ? getallheaders() : array();
+            if (isset($headers['Authorization']) && preg_match('/Bearer\s(\S+)/', $headers['Authorization'], $m)) {
+                $access_token = sanitize_text_field($m[1]);
+            } else {
+                $this->log_debug('No access token provided in Authorization header.');
+                wp_send_json_error(array('message' => __('Access token is required for this request.', 'betait-spfy-playlist')));
+                return;
+            }
+
+            if (!isset($_POST['query']) || empty($_POST['query'])) {
+                $this->log_debug('No search query provided in Spotify track search.');
+                wp_send_json_error(array('message' => __('No search query provided.', 'betait-spfy-playlist')));
+                return;
+            }
+
+            $query = sanitize_text_field($_POST['query']);
+
+            // NEW: les type og limit fra POST (fra checkboxene i UI)
+            $type  = isset($_POST['type'])  ? sanitize_text_field($_POST['type'])  : 'track';
+            $limit = isset($_POST['limit']) ? intval($_POST['limit']) : 20;
+
+            $this->log_debug('Search query: ' . $query . ' | type=' . $type . ' | limit=' . $limit);
+
+            $api_handler = new Betait_Spfy_Playlist_API_Handler();
+            $response = $api_handler->search_tracks($query, $access_token, $type, $limit);
+
+            if (isset($response['success']) && $response['success'] && isset($response['data']['tracks'])) {
+                $this->log_debug('Tracks fetched successfully from Spotify API.');
+                wp_send_json_success(array(
+                    'message' => __('Tracks fetched successfully.', 'betait-spfy-playlist'),
+                    'tracks'  => $response['data']['tracks'],
+                ));
+            } else {
+                $this->log_debug('No tracks found in the Spotify response: ' . print_r($response, true));
+                wp_send_json_error(array(
+                    'message'  => __('No tracks found in the Spotify response.', 'betait-spfy-playlist'),
+                    'response' => $response,
+                ));
+            }
         }
-    
-        // Sjekk for query-parameteren i POST-data
-        if (!isset($_POST['query']) || empty($_POST['query'])) {
-            $this->log_debug('No search query provided in Spotify track search.');
-            wp_send_json_error(array(
-                'message' => __('No search query provided.', 'betait-spfy-playlist'),
-            ));
-            return;
-        }
-    
-        $query = sanitize_text_field($_POST['query']);
-        $this->log_debug('Search query: ' . $query);
-    
-        $api_handler = new Betait_Spfy_Playlist_API_Handler();
-        $response = $api_handler->search_tracks($query, $access_token);
-    
-        if (isset($response['error'])) {
-            $this->log_debug('Error fetching tracks from Spotify API: ' . $response['error']);
-            wp_send_json_error(array(
-                'message' => __('Error fetching tracks from Spotify API.', 'betait-spfy-playlist'),
-                'error'   => $response['error'],
-            ));
-            return;
-        }
-    
-        if (isset($response['success']) && $response['success'] && isset($response['data']['tracks'])) {
-            $this->log_debug('Tracks fetched successfully from Spotify API.');
-            wp_send_json_success(array(
-                'message' => __('Tracks fetched successfully.', 'betait-spfy-playlist'),
-                'tracks'  => $response['data']['tracks'],
-            ));
-        } else {
-            $this->log_debug('No tracks found in the Spotify response: ' . print_r($response, true));
-            wp_send_json_error(array(
-                'message'  => __('No tracks found in the Spotify response.', 'betait-spfy-playlist'),
-                'response' => $response,
-            ));
-        }
-    }
+
     
     
 
@@ -162,7 +155,31 @@ class Betait_Spfy_Playlist_Ajax {
 			'spotify_user_name' => $spotify_user_name ?? __( 'Unknown User', 'betait-spfy-playlist' ),
 		) );
 	}
-	
+	public function save_spotify_user_name() {
+    $uid = get_current_user_id();
+    if ( ! $uid ) {
+        $this->log_debug( 'save_spotify_user_name: not logged in' );
+        wp_send_json_error( array( 'message' => __( 'Not logged in.', 'betait-spfy-playlist' ) ), 401 );
+    }
+
+    $name = isset( $_POST['spotify_user_name'] )
+        ? sanitize_text_field( wp_unslash( $_POST['spotify_user_name'] ) )
+        : '';
+
+    if ( $name === '' ) {
+        $this->log_debug( 'save_spotify_user_name: missing spotify_user_name' );
+        wp_send_json_error( array( 'message' => __( 'Missing spotify_user_name.', 'betait-spfy-playlist' ) ), 400 );
+    }
+
+    update_user_meta( $uid, 'spotify_user_name', $name );
+    $this->log_debug( 'save_spotify_user_name: saved for user ' . $uid );
+
+    wp_send_json_success( array(
+        'ok' => true,
+        'spotify_user_name' => $name,
+    ) );
+}
+
 	
 }
 

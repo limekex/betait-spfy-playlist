@@ -55,42 +55,123 @@ class Betait_Spfy_Playlist_API_Handler {
     }
 
     /** Oppdatert – bruker Bearer hvis mulig, ellers fallback */
-    public function search_tracks( $query, $access_token = null ) {
-        $query = (string) $query;
+    //public function search_tracks( $query, $access_token = null ) {
+        public function search_tracks( $query, $access_token = null, $type_str = 'track', $limit = 20 ) {
+            $query = trim((string)$query);
+            $limit = max(1, min(50, (int)$limit)); // Spotify tillater opptil 50
 
-        // 1) Bearer fra param eller request
-        if (!$access_token) {
-            $access_token = $this->get_bearer_from_request();
-        }
+            // Sjekk om kall kom med brukertoken (fra header) – det avgjør 'market'
+            $have_user_bearer = !empty($this->get_bearer_from_request());
 
-        // 2) Fallback til client_credentials hvis ingen Bearer
-        if (!$access_token) {
-            $this->log_debug('No Bearer in request; falling back to client_credentials for search.');
-            $tok = $this->get_access_token_client_credentials();
-            if (is_array($tok) && isset($tok['error'])) {
-                return array('success'=>false, 'data'=>array('message'=>$tok['error']));
+            // 1) Bearer fra param eller request
+            if (!$access_token) {
+                $access_token = $this->get_bearer_from_request();
             }
-            $access_token = $tok;
+
+            // 2) Fallback til client_credentials om ingen Bearer
+            if (!$access_token) {
+                $have_user_bearer = false; // vi vet vi IKKE har brukertoken
+                $this->log_debug('No Bearer in request; falling back to client_credentials for search.');
+                $tok = $this->get_access_token_client_credentials();
+                if (is_array($tok) && isset($tok['error'])) {
+                    return array('success'=>false, 'data'=>array('message'=>$tok['error']));
+                }
+                $access_token = $tok;
+            }
+
+            $market = $have_user_bearer ? 'from_token' : 'NO'; // fallback-marked når vi ikke har bruker
+
+            // Hvilke typer ble valgt?
+            $types = array_filter(array_map('trim', explode(',', strtolower($type_str))));
+            $types = array_values(array_intersect($types, array('track','artist','album')));
+            if (!$types) $types = array('track');
+
+            // Små hjelpere
+            $seen = array();
+            $tracks_out = array();
+
+            $http_get = function($url) use ($access_token) {
+                $resp = wp_remote_get($url, array(
+                    'headers' => array('Authorization' => 'Bearer ' . $access_token),
+                    'timeout' => 12,
+                ));
+                if (is_wp_error($resp)) return array(null, $resp->get_error_message());
+                $code = wp_remote_retrieve_response_code($resp);
+                $body = json_decode(wp_remote_retrieve_body($resp), true);
+                return array($code === 200 ? $body : null, $code);
+            };
+
+            $add_track = function($t) use (&$tracks_out, &$seen) {
+                if (empty($t['id']) || isset($seen[$t['id']])) return;
+                $seen[$t['id']] = true;
+                $tracks_out[] = $t;
+            };
+
+            // 1) Direkte track-søk
+            if (in_array('track', $types, true)) {
+                $q = array(
+                    'q'      => $query,
+                    'type'   => 'track',
+                    'limit'  => $limit,
+                    'market' => $market, // 'from_token' gir bedre treffbarhet ift. tilgjengelighet
+                );
+                $url = $this->api_base . 'search?' . http_build_query($q);
+                list($data,) = $http_get($url);
+                if (!empty($data['tracks']['items'])) {
+                    foreach ($data['tracks']['items'] as $t) $add_track($t);
+                }
+            }
+
+            // 2) Artist → hent topp-spor for treffende artister
+            if (in_array('artist', $types, true)) {
+                $q = array('q' => $query, 'type' => 'artist', 'limit' => 3);
+                $url = $this->api_base . 'search?' . http_build_query($q);
+                list($data,) = $http_get($url);
+
+                if (!empty($data['artists']['items'])) {
+                    foreach ($data['artists']['items'] as $a) {
+                        if (empty($a['id'])) continue;
+                        $urlTop = $this->api_base . 'artists/' . rawurlencode($a['id']) . '/top-tracks?' . http_build_query(array('market'=>$market));
+                        list($tops,) = $http_get($urlTop);
+                        if (!empty($tops['tracks'])) {
+                            foreach ($tops['tracks'] as $t) $add_track($t);
+                        }
+                    }
+                }
+            }
+
+            // 3) Album → hent tracks for treffende album, og sett album-cover inn på hvert track
+            if (in_array('album', $types, true)) {
+                $q = array('q' => $query, 'type' => 'album', 'limit' => 3, 'market' => $market);
+                $url = $this->api_base . 'search?' . http_build_query($q);
+                list($data,) = $http_get($url);
+
+                if (!empty($data['albums']['items'])) {
+                    foreach ($data['albums']['items'] as $alb) {
+                        if (empty($alb['id'])) continue;
+                        $cover = $alb['images'] ?? array();
+                        $urlAlb = $this->api_base . 'albums/' . rawurlencode($alb['id']) . '/tracks?' . http_build_query(array('limit'=> min(10,$limit), 'market'=>$market));
+                        list($albtracks,) = $http_get($urlAlb);
+                        if (!empty($albtracks['items'])) {
+                            foreach ($albtracks['items'] as $t) {
+                                if (empty($t['album'])) {
+                                    // berik med albumets navn/cover så UI ditt kan vise bilde
+                                    $t['album'] = array(
+                                        'name'   => $alb['name'] ?? '',
+                                        'images' => $cover,
+                                    );
+                                } elseif (empty($t['album']['images'])) {
+                                    $t['album']['images'] = $cover;
+                                }
+                                $add_track($t);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Ferdig
+            return array('success'=>true, 'data'=>array('tracks' => array_values($tracks_out)));
         }
 
-        $url = $this->api_base . 'search?q=' . urlencode($query) . '&type=track';
-        $resp = wp_remote_get($url, array('headers' => array('Authorization' => 'Bearer ' . $access_token)));
-
-        if (is_wp_error($resp)) {
-            return array('success'=>false, 'data'=>array('message'=>'Error fetching data from Spotify API.'));
-        }
-
-        $data = json_decode(wp_remote_retrieve_body($resp), true);
-        if (!empty($data['tracks']['items'])) {
-            return array('success'=>true, 'data'=>array('tracks'=>$data['tracks']['items']));
-        }
-
-        return array(
-            'success'=>false,
-            'data'=>array(
-                'message'=>__( 'No tracks found in the Spotify response.', 'betait-spfy-playlist' ),
-                'response'=>$data,
-            ),
-        );
-    }
 }

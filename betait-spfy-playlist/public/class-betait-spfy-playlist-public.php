@@ -87,22 +87,49 @@ class Betait_Spfy_Playlist_Public {
 	 */
 	public function enqueue_scripts() {
 
-		/**
-		 * This function is provided for demonstration purposes only.
-		 *
-		 * An instance of this class should be passed to the run() function
-		 * defined in Betait_Spfy_Playlist_Loader as all of the hooks are defined
-		 * in that particular class.
-		 *
-		 * The Betait_Spfy_Playlist_Loader will then create the relationship
-		 * between the defined hooks and the functions defined in this
-		 * class.
-		 */
+    // Spotify SDK (kan fint lastes i footer)
+    wp_enqueue_script(
+        'spotify-sdk',
+        'https://sdk.scdn.co/spotify-player.js',
+        array(),
+        null,
+        true
+    );
 
-		 wp_enqueue_script('spotify-sdk', 'https://sdk.scdn.co/spotify-player.js', array(), null, true);
-		 wp_enqueue_script( $this->betait_spfy_playlist, plugin_dir_url( __FILE__ ) . 'js/betait-spfy-playlist-public.js', array( 'jquery' ), $this->version, false );
-		// wp_enqueue_script( $this->betait_spfy_playlist . '-player1', plugin_dir_url( __FILE__ ) . 'js/betait-spfy-player1.js', array( 'jquery' ), $this->version, false );
-	}
+    // Public JS for plugin (anbefaler footer=true for å ikke blokkere render)
+    wp_enqueue_script(
+        $this->betait_spfy_playlist,
+        plugin_dir_url(__FILE__) . 'js/betait-spfy-playlist-public.js',
+        array('jquery'),
+        $this->version,
+        true
+    );
+
+    // Gjør innstillinger tilgjengelig i frontend (IKKE legg hemmeligheter her)
+    wp_localize_script(
+        $this->betait_spfy_playlist,
+        'bspfyPublic',
+        array(
+            // Player
+            'player_name'     => get_option('bspfy_player_name', 'BeTA iT Web Player'),
+            'default_volume'  => (float) get_option('bspfy_default_volume', 0.5), // 0–1
+            'player_theme'    => get_option('bspfy_player_theme', 'default'),
+
+            // Playlist
+            'playlist_theme'  => get_option('bspfy_playlist_theme', 'default'),
+
+            // Øvrig nyttig konfig (ufarlig på frontend)
+            'debug'           => (bool) get_option('bspfy_debug', 0),
+            'rest_base'       => esc_url_raw( rest_url('bspfy/v1/') ),
+
+            // Feature flags (kan også styres via filter)
+            'require_premium' => (bool) apply_filters('bspfy_require_premium', (bool) get_option('bspfy_require_premium', 1)),
+        	'strict_samesite' => (bool) apply_filters('bspfy_strict_samesite', (bool) get_option('bspfy_strict_samesite', 0)),
+    )
+    );
+}
+
+	
 
 
 		/**

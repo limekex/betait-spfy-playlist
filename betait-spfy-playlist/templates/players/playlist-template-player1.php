@@ -10,8 +10,8 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 } 
 
-//$default_cover = plugin_dir_url(__FILE__) . '../assets/default_cover.jpg';
-$default_cover = plugin_dir_url(dirname(__FILE__)) . 'assets/default_cover.jpg';
+//$default_cover = plugin_dir_url(__FILE__) . '../../assets/default_cover.jpg';
+$default_cover = plugin_dir_url(dirname(__FILE__)) . '../assets/default_cover.jpg';
 
 ?>
 

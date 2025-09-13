@@ -24,11 +24,15 @@ class Betait_Spfy_Playlist_CPT {
      *
      * @since    1.0.0
      */
-    public function __construct() {
-        add_action( 'init', array( $this, 'register_cpt_and_taxonomy' ) );
-        add_action( 'add_meta_boxes', array( $this, 'add_meta_boxes' ) );
-        add_action( 'save_post', array( $this, 'save_playlist_meta' ) );
-    }
+public function __construct() {
+    add_action( 'init', array( $this, 'register_cpt_and_taxonomy' ) );
+
+    // Viktig: hook spesifikt for post type 'playlist'
+    add_action( 'add_meta_boxes_playlist', array( $this, 'add_meta_boxes' ) );
+
+    add_action( 'save_post', array( $this, 'save_playlist_meta' ) );
+}
+
 
     /**
      * Log debug information if debugging is enabled.
@@ -108,29 +112,39 @@ class Betait_Spfy_Playlist_CPT {
      *
      * @since    1.0.0
      */
-    public function add_meta_boxes() {
-        // Tracks meta box.
-        add_meta_box(
-            'playlist_tracks_meta_box',
-            __( 'Tracks', 'betait-spfy-playlist' ),
-            array( $this, 'render_meta_box_content' ),
-            'playlist',
-            'normal',
-            'core'
-        );
+        public function add_meta_boxes() {
+            // 1) Description (øverst)
+            add_meta_box(
+                'playlist_description_meta_box',
+                __( 'Playlist Description', 'betait-spfy-playlist' ),
+                array( $this, 'render_description_meta_box' ),
+                'playlist',
+                'normal',
+                'high'
+            );
 
-        // Description meta box (WYSIWYG editor).
-        add_meta_box(
-            'playlist_description_meta_box',
-            __( 'Playlist Description', 'betait-spfy-playlist' ),
-            array( $this, 'render_description_meta_box' ),
-            'playlist',
-            'normal',
-            'high'
-        );
+            // 2) Custom playlist data (Spotify export) – midten
+            add_meta_box(
+                'playlist_spotify_export_meta_box',
+                __( 'Spotify export', 'betait-spfy-playlist' ),
+                array( $this, 'render_spotify_export_meta_box' ),
+                'playlist',
+                'normal',
+                'default'
+            );
 
-        $this->log_debug( 'Meta boxes added successfully.' );
-    }
+            // 3) Tracks (nederst)
+            add_meta_box(
+                'playlist_tracks_meta_box',
+                __( 'Tracks', 'betait-spfy-playlist' ),
+                array( $this, 'render_meta_box_content' ),
+                'playlist',
+                'normal',
+                'default'
+            );
+
+            $this->log_debug( 'Meta boxes added for playlist.' );
+        }
 
  /**
      * Render the content of the description meta box.
@@ -155,140 +169,164 @@ class Betait_Spfy_Playlist_CPT {
  * @since    1.0.0
  * @param    WP_Post $post The post object.
  */
-public function render_meta_box_content( $post ) {
-    $this->log_debug( 'Rendering Tracks meta box for post ID: ' . $post->ID );
+    public function render_meta_box_content( $post ) {
+        $this->log_debug( 'Rendering Tracks meta box for post ID: ' . $post->ID );
+        wp_nonce_field( 'save_playlist_meta', 'playlist_nonce' );
 
-    // Add nonce for security and authentication.
-    wp_nonce_field( 'save_playlist_meta', 'playlist_nonce' );
-    $this->log_debug( 'Nonce added for post ID: ' . $post->ID );
+        // Hent lagrede spor (JSON eller array)
+        $tracks = get_post_meta( $post->ID, '_playlist_tracks', true );
+        if ( is_string( $tracks ) ) $tracks = json_decode( $tracks, true );
+        if ( ! is_array( $tracks ) ) $tracks = [];
 
-    // Retrieve the saved tracks and decode them if necessary.
-    $tracks = get_post_meta( $post->ID, '_playlist_tracks', true );
+        // Søkefelt
+        echo '<label for="playlist_tracks_search" class="bspfy-label">'. esc_html__( 'Search for Tracks', 'betait-spfy-playlist' ) .'</label>';
+        echo '<div class="bsfy-srch" style="margin-bottom:10px;">';
+        echo '  <input type="text" id="playlist_tracks_search" class="bspfy-input" placeholder="'. esc_attr__( 'Enter track name or artist...', 'betait-spfy-playlist' ) .'">';
+        echo '  <button type="button" id="search_tracks_button" class="bspfy-button"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> <span class="screen-reader-text">'. esc_html__( 'Search', 'betait-spfy-playlist' ) .'</span></button>';
+        echo '</div>';
 
-    if ( is_string( $tracks ) ) {
-        $this->log_debug( 'Tracks data is a string. Attempting to decode JSON.' );
-        $tracks = json_decode( $tracks, true ); // Decode JSON to an array.
+        // Auth-placeholder – JS viser "Koble til" el. status
+        echo '<div class="oauth-container" aria-live="polite"></div>';
+
+        // Filtre
+        echo '<div class="bspfy-checkbox-group" style="margin:10px 0;">';
+        echo '  <label class="bspfy-checkbox-label"><input type="checkbox" id="search_filter_artist" value="artist" checked> <span>'. esc_html__( 'Artist', 'betait-spfy-playlist' ) .'</span></label>';
+        echo '  <label class="bspfy-checkbox-label"><input type="checkbox" id="search_filter_track" value="track" checked> <span>'. esc_html__( 'Track', 'betait-spfy-playlist' ) .'</span></label>';
+        echo '  <label class="bspfy-checkbox-label"><input type="checkbox" id="search_filter_album" value="album"> <span>'. esc_html__( 'Album', 'betait-spfy-playlist' ) .'</span></label>';
+        echo '</div>';
+
+        // Resultater (søk)
+        echo '<div id="track_search_results" class="bspfy-track-grid" aria-live="polite"></div>';
+
+        // Lagrede spor
+        echo '<h3 class="bspfy-heading" style="margin-top:16px;">'. esc_html__( 'Playlist Tracks', 'betait-spfy-playlist' ) .'</h3>';
+        echo '<div id="playlist_tracks_list" class="bspfy-track-list">';
+        if ( $tracks ) {
+            foreach ( $tracks as $track ) {
+                $artist_name = $track['artists'][0]['name'] ?? esc_html__( 'Unknown Artist', 'betait-spfy-playlist' );
+                $album_name  = $track['album']['name']       ?? esc_html__( 'Unknown Album', 'betait-spfy-playlist' );
+                $track_name  = $track['name']                ?? esc_html__( 'Unknown Track', 'betait-spfy-playlist' );
+                $track_uri   = $track['uri']                 ?? '';
+                $track_id    = $track['id']                  ?? '';
+
+                echo '<div class="bspfy-track-item" data-track-id="'. esc_attr($track_id) .'">';
+                echo '  <img src="'. esc_url($track['album']['images'][0]['url'] ?? '' ) .'" alt="'. esc_attr($album_name) .'">';
+                echo '  <div class="track-details">';
+                echo '    <div class="track-details-artist track-details-space"><strong>Artist:</strong> '. esc_html($artist_name) .'</div>';
+                echo '    <div class="track-details-album track-details-space"><strong>Album:</strong> '. esc_html($album_name) .'</div>';
+                echo '    <div class="track-details-tracktitle track-details-space"><strong>Track:</strong> '. esc_html($track_name) .'</div>';
+                echo '  </div>';
+                echo '  <div class="track-actions">';
+                echo '    <button type="button" class="bspfy-icon-btn track-actions-preview-button" data-uri="'. esc_attr($track_uri) .'" aria-label="'. esc_attr__('Play/Pause preview', 'betait-spfy-playlist') .'"><i class="fa-solid fa-play" aria-hidden="true"></i></button>';
+                echo '    <button type="button" class="bspfy-icon-btn bspfy-remove-button" data-track-id="'. esc_attr($track_id) .'" aria-label="'. esc_attr__('Remove track', 'betait-spfy-playlist') .'"><i class="fa-regular fa-trash-can" aria-hidden="true"></i></button>';
+                echo '  </div>';
+                echo '</div>';
+            }
+        } else {
+            echo '<div>'. esc_html__( 'No tracks added yet.', 'betait-spfy-playlist' ) .'</div>';
+        }
+        echo '</div>';
+
+        // Attribution
+        echo '<div class="bspfy-spotify-attribution" style="margin-top:10px;">';
+        echo '  <span>'. esc_html__( 'BeTA Spfy Playlist is powered by', 'betait-spfy-playlist' ) .'</span> ';
+        echo '  <img src="'. esc_url( plugin_dir_url( __FILE__ ) . '../assets/Spotify_Full_Logo_RGB_Green.png' ) .'" alt="Spotify" class="bspfy-spotify-logo">';
+        echo '</div>';
+
+        // Hidden JSON
+        echo '<input type="hidden" id="playlist_tracks" name="playlist_tracks" value="'. esc_attr( wp_json_encode( $tracks ) ) .'">';
     }
 
-    if ( ! is_array( $tracks ) ) {
-        $this->log_debug( 'Tracks data is not an array. Setting to empty array.' );
-        $tracks = [];
+
+	public function render_spotify_export_meta_box( $post ) {
+    // Sørg for at media-biblioteket er tilgjengelig
+    if ( function_exists('wp_enqueue_media') ) {
+        wp_enqueue_media();
     }
 
-    $this->log_debug( 'Tracks data decoded successfully. Number of tracks: ' . count( $tracks ) );
+    wp_nonce_field( 'save_playlist_spotify_export', 'playlist_spotify_export_nonce' );
 
-    // Search input and button.
-    echo '<label for="playlist_tracks_search" class="bspfy-label">';
-    _e( 'Search for Tracks', 'betait-spfy-playlist' );
-    echo '</label>';
-    echo '<div class="bsfy-srch"><div style="margin-bottom: 10px;">';
-    echo '<input type="text" id="playlist_tracks_search" class="bspfy-input" placeholder="' . __( 'Enter track name or artist...', 'betait-spfy-playlist' ) . '">';
-    echo '<button type="button" id="search_tracks_button" class="bspfy-button">' . __( 'Search', 'betait-spfy-playlist' ) . '</button>';
-    echo '</div>';
-    $current_user_id = get_current_user_id();
-    $spotify_access_token = $current_user_id ? get_user_meta($current_user_id, 'spotify_access_token', true) : '';
-    $spotify_user_name = '';
-    
-    if ($spotify_access_token) {
-        $spotify_user_name = get_user_meta($current_user_id, 'spotify_user_name', true);
+    $default_name = get_the_title( $post );
+    $custom_name  = get_post_meta( $post->ID, '_playlist_spotify_name', true );
+    if ( $custom_name === '' ) {
+        $custom_name = $default_name;
     }
-    
-    echo '<div class="oauth-container">';
-    if ($spotify_access_token) {
-        $auth_message = sprintf(
-            __( 'Authenticated as %s', 'betait-spfy-playlist' ),
-            esc_html($spotify_user_name ?: __( 'Unknown User', 'betait-spfy-playlist' ))
-        );
-        echo '<div id="spotify-auth-status" class="bspfy-authenticated">' . $auth_message . '</div>';
+
+    $image_id   = (int) get_post_meta( $post->ID, '_playlist_spotify_image_id', true );
+    $img_src    = '';
+    if ( $image_id ) {
+        $img = wp_get_attachment_image_src( $image_id, 'medium' );
+        if ( $img ) $img_src = $img[0];
+    }
+
+    echo '<div class="bspfy-export-box">';
+
+    // Navn
+    echo '<p><label for="playlist_spotify_name"><strong>'. esc_html__( 'Custom playlist name', 'betait-spfy-playlist' ) .'</strong></label></p>';
+    echo '<p><input type="text" id="playlist_spotify_name" name="playlist_spotify_name" class="widefat" value="'. esc_attr( $custom_name ) .'" placeholder="'. esc_attr__( 'Playlist name on Spotify', 'betait-spfy-playlist' ) .'" /></p>';
+
+    // Bilde
+    echo '<p><strong>'. esc_html__( 'Custom playlist image', 'betait-spfy-playlist' ) .'</strong></p>';
+
+    echo '<div id="bspfy-cover-preview" class="'. ( $img_src ? '' : 'is-empty' ) .'" style="border:1px solid #ccd0d4;border-radius:6px;padding:6px;text-align:center;">';
+    if ( $img_src ) {
+        echo '<img src="'. esc_url( $img_src ) .'" alt="" style="max-width:100%;height:auto;border-radius:4px;" />';
     } else {
-        echo '<div id="spotify-auth-button" class="bspfy-button">';
-        echo '<span class="btspfy-button-text">' . __( 'Authenticate with Spotify', 'betait-spfy-playlist' ) . '</span>';
-        echo '<span class="btspfy-button-icon-divider btspfy-button-icon-divider-right"><i class="fa-spotify fab" aria-hidden="true"></i></span>';
-        echo '</div></div>';
+        echo '<span class="description">'. esc_html__( 'No image selected', 'betait-spfy-playlist' ) .'</span>';
     }
     echo '</div>';
-    
 
-    // Checkboxes for search filters.
-    echo '<div class="bspfy-checkbox-group" style="margin-bottom: 10px;">';
+    echo '<p style="margin-top:8px;">';
+    echo '  <button type="button" class="button" id="bspfy-choose-cover">'. esc_html__( 'Choose image', 'betait-spfy-playlist' ) .'</button> ';
+    echo '  <button type="button" class="button link-delete '. ( $img_src ? '' : 'hidden' ) .'" id="bspfy-remove-cover">'. esc_html__( 'Remove', 'betait-spfy-playlist' ) .'</button>';
+    echo '</p>';
 
-    // Artist Checkbox
-    echo '<label class="bspfy-checkbox-label">';
-    echo '<input type="checkbox" id="search_filter_artist" name="search_filter_artist" value="artist" checked>';
-    echo '<span>' . __( 'Artist', 'betait-spfy-playlist' ) . '</span>';
-    echo '</label>';
+    echo '<input type="hidden" id="playlist_spotify_image_id" name="playlist_spotify_image_id" value="'. esc_attr( $image_id ) .'" />';
 
-    // Track Checkbox
-    echo '<label class="bspfy-checkbox-label">';
-    echo '<input type="checkbox" id="search_filter_track" name="search_filter_track" value="track" checked>';
-    echo '<span>' . __( 'Track', 'betait-spfy-playlist' ) . '</span>';
-    echo '</label>';
+    echo '</div>'; // .bspfy-export-box
 
-    // Album Checkbox
-    echo '<label class="bspfy-checkbox-label">';
-    echo '<input type="checkbox" id="search_filter_album" name="search_filter_album" value="album">';
-    echo '<span>' . __( 'Album', 'betait-spfy-playlist' ) . '</span>';
-    echo '</label>';
+    // Liten inline-JS for å håndtere Media Library
+    ?>
+    <script>
+    (function($){
+      let frame;
 
-    echo '</div>';
+      $('#bspfy-choose-cover').on('click', function(e){
+        e.preventDefault();
+        if (frame) { frame.open(); return; }
+        frame = wp.media({
+          title: '<?php echo esc_js( __( 'Select playlist image', 'betait-spfy-playlist' ) ); ?>',
+          button: { text: '<?php echo esc_js( __( 'Use this image', 'betait-spfy-playlist' ) ); ?>' },
+          multiple: false
+        });
+        frame.on('select', function(){
+          const att = frame.state().get('selection').first().toJSON();
+          $('#playlist_spotify_image_id').val(att.id);
+          const url = (att.sizes && att.sizes.medium ? att.sizes.medium.url : att.url);
+          $('#bspfy-cover-preview')
+            .removeClass('is-empty')
+            .html('<img src="'+ url +'" alt="" style="max-width:100%;height:auto;border-radius:4px;">');
+          $('#bspfy-remove-cover').removeClass('hidden');
+        });
+        frame.open();
+      });
 
-
-    $this->log_debug( 'Search input, button, and checkboxes rendered for post ID: ' . $post->ID );
-
-    // Feedback container for search results.
-    echo '<div id="track_search_results" class="bspfy-track-grid"></div>';
-
-// Display current playlist tracks.
-echo '<h3 class="bspfy-heading">' . __( 'Playlist Tracks', 'betait-spfy-playlist' ) . '</h3>';
-echo '<div id="playlist_tracks_list" class="bspfy-track-list">';
-
-if ( $tracks ) {
-    foreach ( $tracks as $track ) {
-        // Extract relevant details.
-        $artist_name = isset( $track['artists'][0]['name'] ) ? $track['artists'][0]['name'] : __( 'Unknown Artist', 'betait-spfy-playlist' );
-        $album_name = isset( $track['album']['name'] ) ? $track['album']['name'] : __( 'Unknown Album', 'betait-spfy-playlist' );
-        $track_name = isset( $track['name'] ) ? $track['name'] : __( 'Unknown Track', 'betait-spfy-playlist' );
-        $track_uri = isset( $track['uri'] ) ? $track['uri'] : '';
-
-        // Render the track item.
-        echo '<div class="bspfy-track-item">';
-        echo '<img src="' . esc_url( $track['album']['images'][0]['url'] ?? '' ) . '" alt="' . esc_attr( $album_name ) . '">';
-        echo '<div class="track-details">';
-        echo '<div class="track-details-artist track-details-space"><strong>Artist:</strong> ' . esc_html( $artist_name ) . '</div>';
-        echo '<div class="track-details-album track-details-space"><strong>Album:</strong> ' . esc_html( $album_name ) . '</div>';
-        echo '<div class="track-details-tracktitle track-details-space"><strong>Track:</strong> ' . esc_html( $track_name ) . '</div>';
-        echo '</div>';
-        echo '<div class="track-actions">';
-        echo '<div class="track-actions-preview-button" data-uri="' . esc_attr( $track_uri ) . '">Play</div>';
-        echo '<button type="button" class="bspfy-remove-button" data-track-id="' . esc_attr( $track['id'] ) . '">' . __( 'Remove', 'betait-spfy-playlist' ) . '</button>';
-        echo '</div>';
-        echo '</div>';
-    }
-
-    $this->log_debug( 'Rendered ' . count( $tracks ) . ' tracks for post ID: ' . $post->ID );
-} else {
-    echo '<div>' . __( 'No tracks added yet.', 'betait-spfy-playlist' ) . '</div>';
-    $this->log_debug( 'No tracks to render for post ID: ' . $post->ID );
+      $('#bspfy-remove-cover').on('click', function(e){
+        e.preventDefault();
+        $('#playlist_spotify_image_id').val('');
+        $('#bspfy-cover-preview').addClass('is-empty').html('<span class="description"><?php echo esc_js( __( 'No image selected', 'betait-spfy-playlist' ) ); ?></span>');
+        $(this).addClass('hidden');
+      });
+    })(jQuery);
+    </script>
+    <style>
+      .bspfy-export-box .hidden { display:none; }
+      .bspfy-export-box .link-delete { color:#b32d2e; }
+      .bspfy-export-box .link-delete:hover { color:#8a2425; }
+    </style>
+    <?php
 }
 
-echo '</div>';
-// Spotify Attribution Footer
-echo '<div class="bspfy-spotify-attribution">';
-echo '<span>' . __( 'BeTA Spfy Playlist is powered by', 'betait-spfy-playlist' ) . '</span>';
-echo '<img src="' . plugin_dir_url( __FILE__ ) . '../assets/Spotify_Full_Logo_RGB_Green.png" alt="Spotify Logo" class="bspfy-spotify-logo">';
-echo '</div>';
-
-
-
-
-
-    // Hidden field to store selected tracks.
-    echo '<input type="hidden" id="playlist_tracks" name="playlist_tracks" value="' . esc_attr( json_encode( $tracks ) ) . '">';
-    $this->log_debug( 'Hidden field for playlist tracks rendered for post ID: ' . $post->ID );
-}
-
-
-	
 
 	 /**
      * Save the playlist tracks meta data.
@@ -310,15 +348,49 @@ echo '</div>';
         }
 
         if ( isset( $_POST['playlist_tracks'] ) ) {
-            $tracks = sanitize_textarea_field( $_POST['playlist_tracks'] );
-            update_post_meta( $post_id, '_playlist_tracks', $tracks );
-            $this->log_debug( 'Tracks saved successfully for post ID: ' . $post_id );
+            $raw    = wp_unslash( $_POST['playlist_tracks'] );
+            $array  = json_decode( $raw, true );
+            if ( ! is_array( $array ) ) $array = [];
+
+            $seen = [];
+            $out  = [];
+            foreach ( $array as $t ) {
+                $id = isset($t['id']) ? sanitize_text_field($t['id']) : '';
+                if ( ! $id || isset($seen[$id]) ) continue; // dropp duplikater
+                $seen[$id] = true;
+                $out[] = $t; // bevar original feltstruktur
+            }
+            update_post_meta( $post_id, '_playlist_tracks', wp_json_encode( $out ) );
+            $this->log_debug( 'Tracks (deduped) saved for post ID: ' . $post_id );
         }
+
 
         if ( isset( $_POST['playlist_description'] ) ) {
             $description = sanitize_textarea_field( $_POST['playlist_description'] );
             update_post_meta( $post_id, '_playlist_description', $description );
             $this->log_debug( 'Description saved successfully for post ID: ' . $post_id );
         }
+
+        // --- Save Spotify export settings ---
+if ( isset($_POST['playlist_spotify_export_nonce']) 
+     && wp_verify_nonce( $_POST['playlist_spotify_export_nonce'], 'save_playlist_spotify_export' ) ) {
+
+    // Navn
+    if ( isset($_POST['playlist_spotify_name']) ) {
+        $name = sanitize_text_field( wp_unslash( $_POST['playlist_spotify_name'] ) );
+        update_post_meta( $post_id, '_playlist_spotify_name', $name );
+        $this->log_debug( 'Spotify export name saved for post ID: ' . $post_id );
+    }
+
+    // Bilde (attachment ID)
+    $img_id = isset($_POST['playlist_spotify_image_id']) ? absint($_POST['playlist_spotify_image_id']) : 0;
+    if ( $img_id ) {
+        update_post_meta( $post_id, '_playlist_spotify_image_id', $img_id );
+        $this->log_debug( 'Spotify export image ID saved for post ID: ' . $post_id );
+    } else {
+        delete_post_meta( $post_id, '_playlist_spotify_image_id' );
+    }
+}
+
     }
 }

@@ -190,16 +190,15 @@
     padding: 2px;
     margin-left: 10px;
     clear: right;
+    display: block;
+    width: 100%;
 }
+
 .track-actions {
     display: flex;
-    justify-content: space-evenly;
-    align-content: stretch;
-    grid-template-columns: 1fr 1fr;
-    align-items: stretch;
-    justify-items: end;
-    flex-wrap: wrap;
-    flex-direction: row;
+    justify-content: end;
+    gap: 10px;
+    margin-right: 10px;
 }
 
 .bspfy-track-grid img, .bspfy-track-list img {
@@ -244,10 +243,10 @@
 .bspfy-remove-button {
     background-color: #d9534f;
     color: #fff;
-    padding: 5px 10px;
+    padding: 10px 15px;
     border: none;
     cursor: pointer;
-    width: 100px;
+    font-size: 18px
 }
 
 .bspfy-remove-button:hover {
@@ -256,21 +255,31 @@
 
 .track-actions-add-track-button, .track-actions-preview-button{
     display: block;
-    width: 100px;
-    padding: 10px;
+    padding: 10px 15px;
     text-align: center;
     background: #1ed760;
-    margin-top: 2px;
+    cursor: pointer;
+    font-size: 18px
 }
+/* Gul state når sporet er i listen */
+.bspfy-icon-btn.is-added {
+  background: #ffd54f;
+  border-color: #ffd54f;
+  color: #111;
+}
+.bspfy-icon-btn.is-added i {
+  color: #111;
+}
+
 .track-actions-add-track-button:hover, .track-actions-preview-button:hover{
     background: darkgray;
     /* font-weight: 500; */
 }
 .track-actions-preview-button {
-    cursor: alias;
+    cursor: pointer;
 }
 .track-actions-add-track-button {
-    cursor: cell;
+    cursor: pointer;
 }
 
 #audio-player, #track-preview-audio {
@@ -300,7 +309,7 @@
 .bspfy-track-item.bspfy-new-track:after {
     content: 'New';
     position: absolute;
-    right: 8px;
+    right: 140px;
     display: inline-block;
     background: #fff;
     padding: 1px 3px;
@@ -345,3 +354,20 @@
     width: auto;
     display: inline-block;
 }
+
+/* Tabs */
+.bspfy-wrap .bspfy-tabs { display:flex; gap:.5rem; margin: 12px 0 16px; }
+.bspfy-wrap .bspfy-tab {
+  appearance:none; border:1px solid #e2e8f0; background:#fff; color:#1f2937;
+  padding:8px 12px; border-radius:8px; cursor:pointer; font-weight:600;
+}
+.bspfy-wrap .bspfy-tab.is-active { background:#111827; color:#fff; border-color:#111827; }
+
+.bspfy-wrap .bspfy-tabpanel { display:none; border:1px solid #e5e7eb; background:#fff; border-radius:10px; padding:16px; }
+.bspfy-wrap .bspfy-tabpanel.is-active { display:block; }
+
+.bspfy-wrap .bspfy-h2 { margin-top:8px; margin-bottom:8px; font-size:1.2rem; }
+
+.bspfy-wrap .bspfy-volume-field { display:flex; align-items:center; gap:.5rem; }
+.bspfy-wrap .bspfy-volume-field input[type="range"] { width:220px; }
+.bspfy-wrap .bspfy-ol { margin-left:1.2em; }
