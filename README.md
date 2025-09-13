@@ -1,99 +1,87 @@
-# WordPress Plugin Boilerplate
+# BSPFY – Spotify Playlist Plugin (v2)
 
-A standardized, organized, object-oriented foundation for building high-quality WordPress Plugins.
+A lightweight, organized foundation for playing Spotify tracks/playlists inside WordPress using the Spotify Web API + Web Playback SDK with secure OAuth 2.0 PKCE.
 
 ## Contents
 
-The WordPress Plugin Boilerplate includes the following files:
+This repo includes:
 
-* `.gitignore`. Used to exclude certain files from the repository.
-* `CHANGELOG.md`. The list of changes to the core project.
-* `README.md`. The file that you’re currently reading.
-* A `betait-spfy-playlist` directory that contains the source code - a fully executable WordPress plugin.
+* `.gitignore` — Files excluded from version control.
+* `CHANGELOG.md` — Project changes.
+* `README.md` — The file you’re reading.
+* A `betait-spfy-playlist` directory — the full, executable WordPress plugin source.
 
 ## Features
 
-* The Boilerplate is based on the [Plugin API](http://codex.wordpress.org/Plugin_API), [Coding Standards](http://codex.wordpress.org/WordPress_Coding_Standards), and [Documentation Standards](https://make.wordpress.org/core/handbook/best-practices/inline-documentation-standards/php/).
-* All classes, functions, and variables are documented so that you know what you need to change.
-* The Boilerplate uses a strict file organization scheme that corresponds both to the WordPress Plugin Repository structure, and that makes it easy to organize the files that compose the plugin.
-* The project includes a `.pot` file as a starting point for internationalization.
+* Secure **OAuth 2.0 PKCE** via WP REST endpoints under `/wp-json/bspfy/v1/oauth/*`.
+* **httpOnly** cookie token storage (configurable SameSite/Secure).
+* **Web Playback SDK** for in-browser playback *(Spotify Premium required for end users)*.
+* Role/membership gate via `bspfy_can_play` filter.
+* Uniform error handling for 401/403/429 with silent refresh + backoff.
+* Debug flag (`BSPFY_DEBUG`) with masked logs.
 
 ## Installation
 
-The Boilerplate can be installed directly into your plugins folder "as-is". You will want to rename it and the classes inside of it to fit your needs. For example, if your plugin is named 'example-me' then:
+Copy the `betait-spfy-playlist` folder into `wp-content/plugins/` and activate it in **Plugins**.
 
-* rename files from `betait-spfy-playlist` to `example-me`
-* change `betait_spfy_playlist` to `example_me`
-* change `betait-spfy-playlist` to `example-me`
-* change `Betait_Spfy_Playlist` to `Example_Me`
-* change `BETAIT_SPFY_PLAYLIST_` to `EXAMPLE_ME_`
+If you fork/rename the plugin, update identifiers accordingly (examples):
+* rename folder `betait-spfy-playlist` → `example-me`
+* change function/variable prefixes `bspfy_` → `example_`
+* change text domain `betait-spfy-playlist` → `example-me`
+* change main class `Betait_Spfy_Playlist` → `Example_Me`
 
-It's safe to activate the plugin at this point. Because the Boilerplate has no real functionality there will be no menu items, meta boxes, or custom post types added until you write the code.
+## Quick Setup
 
-## WordPress.org Preparation
-
-The original launch of this version of the boilerplate included the folder structure needed for using your plugin on WordPress.org. That folder structure has been moved to its own repo here: https://github.com/DevinVinson/Plugin-Directory-Boilerplate
+1. **Create a Spotify app** and add a redirect URI:  
+   `https://yourdomain.com/wp-json/bspfy/v1/oauth/callback`
+2. In `wp-config.php`, optionally set:
+   ```php
+   define('BSPFY_DEBUG', true);
+   define('BSPFY_STRICT_SAMESITE', true);
+   define('BSPFY_REQUIRE_PREMIUM', true);
+3. Place a connect/play UI in your theme/admin as needed; the client helper is available via `window.bspfyAuth`.
 
 ## Recommended Tools
 
 ### i18n Tools
 
-The WordPress Plugin Boilerplate uses a variable to store the text domain used when internationalizing strings throughout the Boilerplate. To take advantage of this method, there are tools that are recommended for providing correct, translatable files:
+The plugin uses the `betait-spfy-playlist` text domain for translations. Suggested tools:
 
 * [Poedit](http://www.poedit.net/)
 * [makepot](http://i18n.svn.wordpress.org/tools/trunk/)
 * [i18n](https://github.com/grappler/i18n)
 
-Any of the above tools should provide you with the proper tooling to internationalize the plugin.
-
 ## License
 
-The WordPress Plugin Boilerplate is licensed under the GPL v2 or later.
+This plugin is licensed under the GPL v2 or later.
 
 > This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License, version 2, as published by the Free Software Foundation.
 
-> This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+> This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
-> You should have received a copy of the GNU General Public License along with this program; if not, write to the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
-
-A copy of the license is included in the root of the plugin’s directory. The file is named `LICENSE`.
+A copy of the license is included in the plugin root as `LICENSE`.
 
 ## Important Notes
 
 ### Licensing
 
-The WordPress Plugin Boilerplate is licensed under the GPL v2 or later; however, if you opt to use third-party code that is not compatible with v2, then you may need to switch to using code that is GPL v3 compatible.
-
-For reference, [here's a discussion](http://make.wordpress.org/themes/2013/03/04/licensing-note-apache-and-gpl/) that covers the Apache 2.0 License used by [Bootstrap](http://twitter.github.io/bootstrap/).
+If you include third-party code that isn’t GPL v2 compatible, ensure it’s GPL v3 compatible or adjust accordingly.
 
 ### Includes
 
-Note that if you include your own classes, or third-party libraries, there are three locations in which said files may go:
+If you add classes or third-party libraries, use:
 
-* `betait-spfy-playlist/includes` is where functionality shared between the admin area and the public-facing parts of the site reside
-* `betait-spfy-playlist/admin` is for all admin-specific functionality
-* `betait-spfy-playlist/public` is for all public-facing functionality
+* `betait-spfy-playlist/includes` — shared functionality
+* `betait-spfy-playlist/admin` — admin-only functionality
+* `betait-spfy-playlist/public` — public-facing functionality
 
-Note that previous versions of the Boilerplate did not include `Betait_Spfy_Playlist_Loader` but this class is used to register all filters and actions with WordPress.
+Register hooks via the loader class (`Betait_Spfy_Playlist_Loader`).
 
-The example code provided shows how to register your hooks with the Loader class.
+### What About Other Tools?
 
-### What About Other Features?
+Build/update tools (Composer, Grunt, GitHub Updater, etc.) aren’t bundled to keep the core minimal. Add them in your fork as needed.
 
-The previous version of the WordPress Plugin Boilerplate included support for a number of different projects such as the [GitHub Updater](https://github.com/afragen/github-updater).
+## Credits
 
-These tools are not part of the core of this Boilerplate, as I see them as being additions, forks, or other contributions to the Boilerplate.
-
-The same is true of using tools like Grunt, Composer, etc. These are all fantastic tools, but not everyone uses them. In order to  keep the core Boilerplate as light as possible, these features have been removed and will be introduced in other editions, and will be listed and maintained on the project homepage.
-
-# Credits
-
-The WordPress Plugin Boilerplate was started in 2011 by [Tom McFarlin](http://twitter.com/tommcfarlin/) and has since included a number of great contributions. In March of 2015 the project was handed over by Tom to Devin Vinson.
-
-The current version of the Boilerplate was developed in conjunction with [Josh Eaton](https://twitter.com/jjeaton), [Ulrich Pogson](https://twitter.com/grapplerulrich), and [Brad Vincent](https://twitter.com/themergency).
-
-The homepage is based on a design as provided by [HTML5Up](http://html5up.net), the Boilerplate logo was designed by Rob McCaskill of [BungaWeb](http://bungaweb.com), and the site `favicon` was created by [Mickey Kay](https://twitter.com/McGuive7).
-
-## Documentation, FAQs, and More
-
-If you’re interested in writing any documentation or creating tutorials please [let me know](http://devinvinson.com/contact/) .
+Built on the WordPress Plugin Boilerplate (Tom McFarlin → Devin Vinson) and adapted for Spotify playback.  
+For questions or contributions, open an issue in this repository.
