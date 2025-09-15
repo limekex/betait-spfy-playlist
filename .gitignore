@@ -9,6 +9,8 @@
 *.vi
 *~
 *.sass-cache
+sftp.json
+issues.json
 
 # OS or Editor folders
 .DS_Store
@@ -39,3 +41,5 @@ dwsync.xml
 intermediate
 .idea
 cache
+.vscode
+node_modules
