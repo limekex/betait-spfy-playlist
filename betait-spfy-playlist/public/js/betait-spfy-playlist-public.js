@@ -26,6 +26,8 @@
 
     function startAuthPopup() {
       return new Promise(async (resolve, reject) => {
+        const ov = window.bspfyOverlay; ov && ov.show({ title: 'Connecting to Spotify…', reason: 'auth' });
+
         const redirectBack = window.location.href;
         let auth;
         try {
@@ -34,7 +36,10 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ redirectBack })
           });
-        } catch (e) { return reject(e); }
+        } catch (e) {
+          ov && ov.hide();
+          return reject(e);
+        }
 
         const w = 520, h = 680;
         const left = window.screenX + (window.outerWidth - w) / 2;
@@ -42,11 +47,17 @@
         const popup = window.open(auth.authorizeUrl, 'bspfy-auth',
           `width=${w},height=${h},left=${left},top=${top}`);
 
+        if (!popup) {
+          ov && ov.hide();
+          return reject(new Error('POPUP_BLOCKED'));
+        }
+
         const handler = (ev) => {
           if (ev.origin !== window.location.origin) return;
           if (ev.data && ev.data.type === 'bspfy-auth' && ev.data.success) {
             window.removeEventListener('message', handler);
             try { popup && popup.close(); } catch {}
+            ov && ov.hide();
             resolve(true);
           }
         };
@@ -56,6 +67,8 @@
           try {
             if (!popup || popup.closed) {
               clearInterval(checkClosed);
+              window.removeEventListener('message', handler);
+              ov && ov.hide();
               reject(new Error('popup-closed'));
             }
           } catch {}
@@ -66,78 +79,75 @@
     return { ensureAccessToken, startAuthPopup, fetchJSON };
   })();
 
-/** --------------------------------------------------------------
- *  Global Spotify fetch: single-flight token + concurrency gate
- *  -------------------------------------------------------------- */
-let __bspfyTokPromise = null;
-async function ensureTokenSingleflight() {
-  if (!__bspfyTokPromise) {
-    __bspfyTokPromise = window.bspfyAuth.ensureAccessToken()
-      .finally(() => { __bspfyTokPromise = null; });
+  /** --------------------------------------------------------------
+   *  Global Spotify fetch: single-flight token + concurrency gate
+   *  -------------------------------------------------------------- */
+  let __bspfyTokPromise = null;
+  async function ensureTokenSingleflight() {
+    if (!__bspfyTokPromise) {
+      __bspfyTokPromise = window.bspfyAuth.ensureAccessToken()
+        .finally(() => { __bspfyTokPromise = null; });
+    }
+    return __bspfyTokPromise;
   }
-  return __bspfyTokPromise;
-}
 
-// Maks samtidige Spotify-kall fra klient
-const BSPFY_GATE_MAX = 4;
-const __bspfyGateQueue = [];
-async function gated(fn) {
-  while (__bspfyGateQueue.length >= BSPFY_GATE_MAX) await __bspfyGateQueue[0];
-  let done; const p = new Promise(r => (done = r));
-  __bspfyGateQueue.push(p);
-  try { return await fn(); }
-  finally { done(); __bspfyGateQueue.shift(); }
-}
+  // Maks samtidige Spotify-kall fra klient
+  const BSPFY_GATE_MAX = 4;
+  const __bspfyGateQueue = [];
+  async function gated(fn) {
+    while (__bspfyGateQueue.length >= BSPFY_GATE_MAX) await __bspfyGateQueue[0];
+    let done; const p = new Promise(r => (done = r));
+    __bspfyGateQueue.push(p);
+    try { return await fn(); }
+    finally { done(); __bspfyGateQueue.shift(); }
+  }
 
-// Jittered backoff (for 429)
-const backoff = (ms) => new Promise(r => setTimeout(r, ms + Math.random()*ms));
+  // Jittered backoff (for 429)
+  const backoff = (ms) => new Promise(r => setTimeout(r, ms + Math.random()*ms));
 
-// Hoved-wrapper for Spotify Web API
-async function bspfyFetch(url, opts = {}, attempt = 0) {
-  return gated(async () => {
-    const token = await ensureTokenSingleflight();
-    const headers = { 'Authorization': `Bearer ${token}`, ...(opts.headers||{}) };
-    const res = await fetch(url, { ...opts, headers });
+  // Hoved-wrapper for Spotify Web API
+  async function bspfyFetch(url, opts = {}, attempt = 0) {
+    return gated(async () => {
+      const token = await ensureTokenSingleflight();
+      const headers = { 'Authorization': `Bearer ${token}`, ...(opts.headers||{}) };
+      const res = await fetch(url, { ...opts, headers });
 
-    if (res.status === 401 && attempt < 1) {
-      await backoff(150);
-      return bspfyFetch(url, opts, attempt + 1);
-    }
-    if (res.status === 429) {
-      const ra = Number(res.headers.get('Retry-After') || 1);
-      await backoff(ra * 1000);
-      return bspfyFetch(url, opts, attempt + 1);
-    }
-    if (!res.ok) {
-      let msg = res.statusText;
-      try { const j = await res.json(); msg = j?.error?.message || msg; } catch {}
-      const err = new Error(msg); err.status = res.status; throw err;
-    }
-    try { return await res.json(); } catch { return {}; }
-  });
-}
+      if (res.status === 401 && attempt < 1) {
+        await backoff(150);
+        return bspfyFetch(url, opts, attempt + 1);
+      }
+      if (res.status === 429) {
+        const ra = Number(res.headers.get('Retry-After') || 1);
+        await backoff(ra * 1000);
+        return bspfyFetch(url, opts, attempt + 1);
+      }
+      if (!res.ok) {
+        let msg = res.statusText;
+        try { const j = await res.json(); msg = j?.error?.message || msg; } catch {}
+        const err = new Error(msg); err.status = res.status; throw err;
+      }
+      try { return await res.json(); } catch { return {}; }
+    });
+  }
 
-
-    /** --------------------------------------------------------------
+  /** --------------------------------------------------------------
    *  MINI UI: volum + device-velger (bspfyMini) – med slide in/out
    *  -------------------------------------------------------------- */
-
   const bspfyApi = {
-  devices: () => bspfyFetch('https://api.spotify.com/v1/me/player/devices'),
-  mePlayer: () => bspfyFetch('https://api.spotify.com/v1/me/player'),
-  transfer: (deviceId, play = true) =>
-    bspfyFetch('https://api.spotify.com/v1/me/player', {
-      method: 'PUT',
-      headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify({ device_ids: [deviceId], play })
-    }),
-  setRemoteVolume: (deviceId, vol0to1) =>
-    bspfyFetch(
-      `https://api.spotify.com/v1/me/player/volume?device_id=${encodeURIComponent(deviceId)}&volume_percent=${Math.round(vol0to1*100)}`,
-      { method: 'PUT' }
-    ),
-};
-
+    devices: () => bspfyFetch('https://api.spotify.com/v1/me/player/devices'),
+    mePlayer: () => bspfyFetch('https://api.spotify.com/v1/me/player'),
+    transfer: (deviceId, play = true) =>
+      bspfyFetch('https://api.spotify.com/v1/me/player', {
+        method: 'PUT',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ device_ids: [deviceId], play })
+      }),
+    setRemoteVolume: (deviceId, vol0to1) =>
+      bspfyFetch(
+        `https://api.spotify.com/v1/me/player/volume?device_id=${encodeURIComponent(deviceId)}&volume_percent=${Math.round(vol0to1*100)}`,
+        { method: 'PUT' }
+      ),
+  };
 
   function bspfyMiniTemplate() {
     return `
@@ -170,204 +180,200 @@ async function bspfyFetch(url, opts = {}, attempt = 0) {
     _volUserTouch: false,
     _localDeviceName: 'BeTA iT Web Player',
 
+    init(player, mountEl, localDeviceId, localDeviceName) {
+      this._player = player;
+      this._localDeviceId = localDeviceId || null;
+      this._selectedDeviceId = localDeviceId || null;
+      this._localDeviceName = localDeviceName || this._localDeviceName;
 
-  init(player, mountEl, localDeviceId, localDeviceName) {
-  this._player = player;
-  this._localDeviceId = localDeviceId || null;
-  this._selectedDeviceId = localDeviceId || null;
-  this._localDeviceName = localDeviceName || this._localDeviceName;
+      if (!mountEl) mountEl = document.getElementById('bspfy-pl1-player')
+                      || document.getElementById('bspfy-pl1-player-controls')
+                      || document.getElementById('bspfy-player')
+                      || document.body;
 
-  if (!mountEl) mountEl = document.getElementById('bspfy-pl1-player')
-                  || document.getElementById('bspfy-pl1-player-controls')
-                  || document.getElementById('bspfy-player')
-                  || document.body;
+      mountEl.insertAdjacentHTML('beforeend', bspfyMiniTemplate());
+      this._root   = mountEl.querySelector('#bspfy-mini');
+      this._list   = this._root.querySelector('.bspfy-mini-devices');
+      this._toastEl= this._root.querySelector('.bspfy-mini-toast');
+      this._labelEl= this._root.querySelector('.bspfy-mini-device-label');
+      this._volEl  = this._root.querySelector('.bspfy-mini-vol');
 
-  mountEl.insertAdjacentHTML('beforeend', bspfyMiniTemplate());
-  this._root   = mountEl.querySelector('#bspfy-mini');
-  this._list   = this._root.querySelector('.bspfy-mini-devices');
-  this._toastEl= this._root.querySelector('.bspfy-mini-toast');
-  this._labelEl= this._root.querySelector('.bspfy-mini-device-label');
-  this._volEl  = this._root.querySelector('.bspfy-mini-vol');
+      // Åpne/lukke enhetsmeny
+      this._root.querySelector('.bspfy-mini-speaker').addEventListener('click', async () => {
+        if (this._list.hidden) { await this._renderDevices(); this._list.hidden = false; }
+        else { this._list.hidden = true; }
+      });
+      document.addEventListener('click', ev => {
+        if (!this._root.contains(ev.target)) this._list.hidden = true;
+      });
 
-  // Åpne/lukke enhetsmeny
-  this._root.querySelector('.bspfy-mini-speaker').addEventListener('click', async () => {
-    if (this._list.hidden) { await this._renderDevices(); this._list.hidden = false; }
-    else { this._list.hidden = true; }
-  });
-  document.addEventListener('click', ev => {
-    if (!this._root.contains(ev.target)) this._list.hidden = true;
-  });
+      // Volum (lokalt → SDK, fjern → Web API) m/ debounce + "user-touch" lås
+      const setRemoteVol = bspfyDebounce(async (id, v) => {
+        try { await bspfyApi.setRemoteVolume(id, v); }
+        catch(e){ this._toast(`Kunne ikke sette volum (${e.status||''})`); }
+      }, 180);
 
-  // Volum (lokalt → SDK, fjern → Web API) m/ debounce + "user-touch" lås
-  const setRemoteVol = bspfyDebounce(async (id, v) => {
-    try { await bspfyApi.setRemoteVolume(id, v); }
-    catch(e){ this._toast(`Kunne ikke sette volum (${e.status||''})`); }
-  }, 180);
+      let touchT;
+      this._volEl.addEventListener('input', async (e) => {
+        const v = Number(e.target.value);
+        this._volUserTouch = true; clearTimeout(touchT);
+        touchT = setTimeout(()=>{ this._volUserTouch = false; }, 400);
 
-  let touchT;
-  this._volEl.addEventListener('input', async (e) => {
-    const v = Number(e.target.value);
-    this._volUserTouch = true; clearTimeout(touchT);
-    touchT = setTimeout(()=>{ this._volUserTouch = false; }, 400);
+        if (this._selectedDeviceId && this._selectedDeviceId !== this._localDeviceId) {
+          try { await bspfyApi.setRemoteVolume(this._selectedDeviceId, v); } catch(e){ this._toast(`Kunne ikke sette volum (${e.status||''})`); }
+        } else if (this._player) {
+          try { await this._player.setVolume(v); } catch {}
+        }
+      });
 
-    if (this._selectedDeviceId && this._selectedDeviceId !== this._localDeviceId) {
-      try { await bspfyApi.setRemoteVolume(this._selectedDeviceId, v); } catch(e){ this._toast(`Kunne ikke sette volum (${e.status||''})`); }
-    } else if (this._player) {
-      try { await this._player.setVolume(v); } catch {}
-    }
-  });
-
-  // Start bakgrunnspolling ETTER at DOM-pekers er satt
-  this._startPolling();
-},
-
+      // Start bakgrunnspolling ETTER at DOM-pekers er satt
+      this._startPolling();
+    },
 
     // Vis ved playing, skjul med liten forsinkelse ved pause/stop
-onState(state) {
-  if (!this._root) return; // mini-UI ikke montert enda
+    onState(state) {
+      if (!this._root) return; // mini-UI ikke montert enda
 
-  const isPlaying = !!state && state.paused === false;
+      const isPlaying = !!state && state.paused === false;
 
-  if (isPlaying) {
-    clearTimeout(this._hideT);
-    this._root.classList.add('bspfy-visible');
-    this._root.setAttribute('aria-hidden', 'false');
+      if (isPlaying) {
+        clearTimeout(this._hideT);
+        this._root.classList.add('bspfy-visible');
+        this._root.setAttribute('aria-hidden', 'false');
 
-    // sync volum når baren vises
-    this._player?.getVolume().then(v => {
-      if (typeof v === 'number') this._volEl.value = v;
-    }).catch(()=>{});
+        // sync volum når baren vises
+        this._player?.getVolume().then(v => {
+          if (typeof v === 'number') this._volEl.value = v;
+        }).catch(()=>{});
 
-    if (!this._selectedDeviceId && this._localDeviceId) {
-      this._selectedDeviceId = this._localDeviceId;
-    }
-    if (this._labelEl && this._selectedDeviceId === this._localDeviceId) {
-      this._labelEl.textContent = this._localDeviceName;
-    }
-  } else {
-    clearTimeout(this._hideT);
-    this._hideT = setTimeout(() => {
-      this._root.classList.remove('bspfy-visible');
-      this._root.setAttribute('aria-hidden', 'true');
-    }, 150);
-  }
-},
-
-
-async _renderDevices(silent = false) {
-  if (!silent) this._list.innerHTML = '<button class="bspfy-mini-devices-row" disabled>Laster enheter…</button>';
-  let data;
-  try { data = await bspfyApi.devices(); }
-  catch (e) {
-    if (!silent) this._list.innerHTML = `<button class="bspfy-mini-devices-row bspfy-error" disabled>Kunne ikke hente enheter (${e.status||''})</button>`;
-    return;
-  }
-
-  const devices = Array.isArray(data?.devices) ? data.devices : [];
-  if (!devices.length) {
-    if (!silent) this._list.innerHTML = `<button class="bspfy-mini-devices-row" disabled>Ingen enheter funnet. Åpne Spotify-appen.</button>`;
-    return;
-  }
-
-  this._list.innerHTML = devices.map(d => {
-    const isLocal  = d.id === this._localDeviceId;
-    const selected = (this._selectedDeviceId || this._localDeviceId) === d.id;
-    const active   = d.is_active ? ' (aktiv)' : '';
-    const label    = isLocal ? (d.name || this._localDeviceName) : `${d.name || d.type}${active}`;
-    return `<button class="bspfy-mini-devices-row${selected ? ' selected':''}" data-id="${d.id}" data-local="${isLocal ? '1':'0'}">
-              <span class="bspfy-dot${d.is_active ? ' on':''}"></span>${label}
-            </button>`;
-  }).join('');
-
-  this._list.querySelectorAll('.bspfy-mini-devices-row').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      const id = e.currentTarget.getAttribute('data-id');
-      const isLocal = e.currentTarget.getAttribute('data-local') === '1';
-      try { await bspfyApi.transfer(id, true); }
-      catch (err) {
-        return this._toast(err.status === 403 ? 'Spotify Premium kreves for å bytte enhet.' : `Kunne ikke bytte enhet (${err.status||''})`);
-      }
-      this._selectedDeviceId = id;
-      this._labelEl.textContent = isLocal ? (this._localDeviceName) : 'Annen enhet';
-      this._toast(isLocal ? 'Spiller i denne nettleseren' : 'Overførte avspilling');
-      this._list.hidden = true;
-      this._list.querySelectorAll('.selected').forEach(x=>x.classList.remove('selected'));
-      e.currentTarget.classList.add('selected');
-    });
-  });
-},
-
-// ←← LEGGER TIL POLLING-METODER HER →→
-  _startPolling() {
-    clearInterval(this._pollT);
-    this._pollT = setInterval(()=>{ this._maybePoll(); }, 5000);
-  },
-
-  async _maybePoll() {
-    if (!this._player || !this._list) return;
-
-    const menuOpen = !this._list.hidden;
-    const isRemote = this._selectedDeviceId && this._selectedDeviceId !== this._localDeviceId;
-
-    // sjekk om vi spiller (kan feile i noen tilstander)
-    let playing = false;
-    try { const st = await this._player.getCurrentState(); playing = !!st && st.paused === false; } catch {}
-
-    if (!(menuOpen || playing || isRemote)) return;
-
-    // 1) Oppdater deviceliste stille
-    try {
-      const data = await bspfyApi.devices();
-      const devices = Array.isArray(data?.devices) ? data.devices : [];
-      const local = devices.find(d => d.id === this._localDeviceId);
-      if (local && this._labelEl && this._selectedDeviceId === this._localDeviceId) {
-        this._labelEl.textContent = local.name || this._localDeviceName;
-      }
-      if (!this._list.hidden) this._renderDevices(true);
-    } catch {}
-
-    // 2) Remote volum sync
-    if (isRemote && !this._volUserTouch) {
-      try {
-        const me = await bspfyApi.mePlayer();
-        const dev = me?.device;
-        if (dev && dev.id === this._selectedDeviceId && typeof dev.volume_percent === 'number') {
-          const v = Math.max(0, Math.min(100, dev.volume_percent)) / 100;
-          this._volEl.value = String(v);
+        if (!this._selectedDeviceId && this._localDeviceId) {
+          this._selectedDeviceId = this._localDeviceId;
         }
+        if (this._labelEl && this._selectedDeviceId === this._localDeviceId) {
+          this._labelEl.textContent = this._localDeviceName;
+        }
+      } else {
+        clearTimeout(this._hideT);
+        this._hideT = setTimeout(() => {
+          this._root.classList.remove('bspfy-visible');
+          this._root.setAttribute('aria-hidden', 'true');
+        }, 150);
+      }
+    },
+
+    async _renderDevices(silent = false) {
+      if (!silent) this._list.innerHTML = '<button class="bspfy-mini-devices-row" disabled>Laster enheter…</button>';
+      let data;
+      try { data = await bspfyApi.devices(); }
+      catch (e) {
+        if (!silent) this._list.innerHTML = `<button class="bspfy-mini-devices-row bspfy-error" disabled>Kunne ikke hente enheter (${e.status||''})</button>`;
+        return;
+      }
+
+      const devices = Array.isArray(data?.devices) ? data.devices : [];
+      if (!devices.length) {
+        if (!silent) this._list.innerHTML = `<button class="bspfy-mini-devices-row" disabled>Ingen enheter funnet. Åpne Spotify-appen.</button>`;
+        return;
+      }
+
+      this._list.innerHTML = devices.map(d => {
+        const isLocal  = d.id === this._localDeviceId;
+        const selected = (this._selectedDeviceId || this._localDeviceId) === d.id;
+        const active   = d.is_active ? ' (aktiv)' : '';
+        const label    = isLocal ? (d.name || this._localDeviceName) : `${d.name || d.type}${active}`;
+        return `<button class="bspfy-mini-devices-row${selected ? ' selected':''}" data-id="${d.id}" data-local="${isLocal ? '1':'0'}">
+                  <span class="bspfy-dot${d.is_active ? ' on':''}"></span>${label}
+                </button>`;
+      }).join('');
+
+      this._list.querySelectorAll('.bspfy-mini-devices-row').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const id = e.currentTarget.getAttribute('data-id');
+          const isLocal = e.currentTarget.getAttribute('data-local') === '1';
+          try { await bspfyApi.transfer(id, true); }
+          catch (err) {
+            return this._toast(err.status === 403 ? 'Spotify Premium kreves for å bytte enhet.' : `Kunne ikke bytte enhet (${err.status||''})`);
+          }
+          this._selectedDeviceId = id;
+          this._labelEl.textContent = isLocal ? (this._localDeviceName) : 'Annen enhet';
+          this._toast(isLocal ? 'Spiller i denne nettleseren' : 'Overførte avspilling');
+          this._list.hidden = true;
+          this._list.querySelectorAll('.selected').forEach(x=>x.classList.remove('selected'));
+          e.currentTarget.classList.add('selected');
+        });
+      });
+    },
+
+    // ←← POLLING →→
+    _startPolling() {
+      clearInterval(this._pollT);
+      this._pollT = setInterval(()=>{ this._maybePoll(); }, 5000);
+    },
+
+    async _maybePoll() {
+      if (!this._player || !this._list) return;
+
+      const menuOpen = !this._list.hidden;
+      const isRemote = this._selectedDeviceId && this._selectedDeviceId !== this._localDeviceId;
+
+      // sjekk om vi spiller (kan feile i noen tilstander)
+      let playing = false;
+      try { const st = await this._player.getCurrentState(); playing = !!st && st.paused === false; } catch {}
+
+      if (!(menuOpen || playing || isRemote)) return;
+
+      // 1) Oppdater deviceliste stille
+      try {
+        const data = await bspfyApi.devices();
+        const devices = Array.isArray(data?.devices) ? data.devices : [];
+        const local = devices.find(d => d.id === this._localDeviceId);
+        if (local && this._labelEl && this._selectedDeviceId === this._localDeviceId) {
+          this._labelEl.textContent = local.name || this._localDeviceName;
+        }
+        if (!this._list.hidden) this._renderDevices(true);
       } catch {}
+
+      // 2) Remote volum sync
+      if (isRemote && !this._volUserTouch) {
+        try {
+          const me = await bspfyApi.mePlayer();
+          const dev = me?.device;
+          if (dev && dev.id === this._selectedDeviceId && typeof dev.volume_percent === 'number') {
+            const v = Math.max(0, Math.min(100, dev.volume_percent)) / 100;
+            this._volEl.value = String(v);
+          }
+        } catch {}
+      }
+    },
+
+    _toast(msg) {
+      if (!this._toastEl) return;
+      this._toastEl.textContent = msg;
+      this._toastEl.hidden = false;
+      clearTimeout(this._toastEl._t);
+      this._toastEl._t = setTimeout(()=>{ this._toastEl.hidden = true; }, 1600);
     }
-  },
-
-  _toast(msg) {
-    if (!this._toastEl) return;
-    this._toastEl.textContent = msg;
-    this._toastEl.hidden = false;
-    clearTimeout(this._toastEl._t);
-    this._toastEl._t = setTimeout(()=>{ this._toastEl.hidden = true; }, 1600);
-  }
-};
-
+  };
 
   /** --------------------------------------------------------------
    *  Spotify Web Playback SDK – public
    *  -------------------------------------------------------------- */
-    let spotifyPlayer;
-    let deviceId;
-    let currentTrackUri = null;
-    let progressTimer = null;
-    let isSeeking = false;
-    let lastPlayback = null;      // for å detektere "ended"
-    let autoAdvanceLock = false;  // hindrer dobbeltrigger
-
+  let spotifyPlayer;
+  let deviceId;
+  let currentTrackUri = null;
+  let progressTimer = null;
+  let isSeeking = false;
 
   async function initializeSpotifyPlayer() {
     const playerName = (window.bspfyPublic && bspfyPublic.player_name) || 'BeTA iT Web Player';
     const startVol   = (window.bspfyPublic && typeof bspfyPublic.default_volume === 'number') ? bspfyPublic.default_volume : 0.5;
 
+    const ov = window.bspfyOverlay; ov && ov.show({ title: 'Preparing Web Player…', reason: 'sdk-init' });
+
     return new Promise(async (resolve, reject) => {
       try {
         if (!window.Spotify) {
+          ov && ov.hide();
           console.error('Spotify Web Playback SDK not loaded.');
           return reject('Spotify SDK not loaded.');
         }
@@ -382,70 +388,69 @@ async _renderDevices(silent = false) {
           volume: startVol
         });
 
-        // 🔧 Viktig: eksponer også på window for seek-koden
+        // eksponer på window for seek-koden
         window.spotifyPlayer = spotifyPlayer;
 
         spotifyPlayer.addListener('ready', ({ device_id }) => {
-            deviceId = device_id;
-            console.log('Spotify Player ready with Device ID:', device_id);
+          deviceId = device_id;
+          console.log('Spotify Player ready with Device ID:', device_id);
 
-            try {
-              const mount =
-                document.getElementById('bspfy-pl1-player') ||
-                document.getElementById('bspfy-pl1-player-controls') ||
-                document.getElementById('bspfy-player') ||
-                document.body;
+          try {
+            const mount =
+              document.getElementById('bspfy-pl1-player') ||
+              document.getElementById('bspfy-pl1-player-controls') ||
+              document.getElementById('bspfy-player') ||
+              document.body;
 
-              const localName = (window.bspfyPublic && bspfyPublic.player_name) || 'BeTA iT Web Player';
-              window.bspfyMini?.init(spotifyPlayer, mount, deviceId, localName);
-              document.dispatchEvent(new CustomEvent('bspfy:player_ready', { detail: { deviceId: device_id } }));
-            } catch (e) { console.warn('bspfyMini init feilet', e); }
+            const localName = (window.bspfyPublic && bspfyPublic.player_name) || 'BeTA iT Web Player';
+            window.bspfyMini?.init(spotifyPlayer, mount, deviceId, localName);
+            document.dispatchEvent(new CustomEvent('bspfy:player_ready', { detail: { deviceId: device_id } }));
+          } catch (e) { console.warn('bspfyMini init feilet', e); }
 
-            resolve();
-          });
+          ov && ov.hide();
+          resolve();
+        });
 
         spotifyPlayer.addListener('not_ready', ({ device_id }) => {
           console.error('Spotify Player not ready with Device ID:', device_id);
         });
 
         spotifyPlayer.addListener('player_state_changed', state => {
-            if (!state) return;
+          if (!state) return;
 
-            const isPlaying = !state.paused;
-            const uri = state.track_window.current_track?.uri || currentTrackUri;
+          const isPlaying = !state.paused;
+          const uri = state.track_window.current_track?.uri || currentTrackUri;
 
-            currentTrackUri = uri;
+          currentTrackUri = uri;
 
-            updatePlayIcon(uri, isPlaying);
-            updateNowPlayingCover(uri);
-            updateNowPlayingUI(state);
+          updatePlayIcon(uri, isPlaying);
+          updateNowPlayingCover(uri);
+          updateNowPlayingUI(state);
 
-             window.bspfyMini?.onState(state);
-            if (isPlaying) startProgressTimer();
-            else           stopProgressTimer();
-            });
-
+          window.bspfyMini?.onState(state);
+          if (isPlaying) startProgressTimer();
+          else           stopProgressTimer();
+        });
 
         spotifyPlayer.connect();
       } catch (err) {
+        ov && ov.hide();
         console.error('initializeSpotifyPlayer failed', err);
         reject(err);
       }
-    });
+    }).finally(() => { ov && ov.hide(); });
   }
 
   /** --------------------------------------------------------------
    *  UI helpers – ikon, cover, tekst, fremdrift
    *  -------------------------------------------------------------- */
-  
   function getPlaylistUris() {
-  const seen = new Set();
-  return Array.from(document.querySelectorAll('.bspfy-play-icon[data-uri]'))
-    .map(btn => btn.getAttribute('data-uri'))
-    .filter(uri => uri && !seen.has(uri) && (seen.add(uri) || true));
-}
+    const seen = new Set();
+    return Array.from(document.querySelectorAll('.bspfy-play-icon[data-uri]'))
+      .map(btn => btn.getAttribute('data-uri'))
+      .filter(uri => uri && !seen.has(uri) && (seen.add(uri) || true));
+  }
 
-  
   function updatePlayIcon(trackUri, isPlaying) {
     document.querySelectorAll('.bspfy-play-icon').forEach(btn => {
       const icon = btn.querySelector('i');
@@ -520,84 +525,88 @@ async _renderDevices(silent = false) {
       progressTimer = null;
     }
   }
-  function getTrackButtons() {
-  return Array.from(document.querySelectorAll('.bspfy-play-icon[data-uri]'));
-}
-function getNextUri(currentUri) {
-  const list = getTrackButtons();
-  if (!list.length) return null;
-  const idx = list.findIndex(b => b.getAttribute('data-uri') === currentUri);
-  const nextBtn = idx >= 0 ? list[(idx + 1) % list.length] : list[0];
-  return nextBtn?.getAttribute('data-uri') || null;
-}
-function getPrevUri(currentUri) {
-  const list = getTrackButtons();
-  if (!list.length) return null;
-  const idx = list.findIndex(b => b.getAttribute('data-uri') === currentUri);
-  const prevBtn = idx > 0 ? list[idx - 1] : list[list.length - 1];
-  return prevBtn?.getAttribute('data-uri') || null;
-}
-async function playNextInDom() {
-  const nextUri = getNextUri(currentTrackUri);
-  if (nextUri) await playTrack(nextUri);
-}
-async function playPrevInDom() {
-  const prevUri = getPrevUri(currentTrackUri);
-  if (prevUri) await playTrack(prevUri);
-}
 
+  function getTrackButtons() {
+    return Array.from(document.querySelectorAll('.bspfy-play-icon[data-uri]'));
+  }
+  function getNextUri(currentUri) {
+    const list = getTrackButtons();
+    if (!list.length) return null;
+    const idx = list.findIndex(b => b.getAttribute('data-uri') === currentUri);
+    const nextBtn = idx >= 0 ? list[(idx + 1) % list.length] : list[0];
+    return nextBtn?.getAttribute('data-uri') || null;
+  }
+  function getPrevUri(currentUri) {
+    const list = getTrackButtons();
+    if (!list.length) return null;
+    const idx = list.findIndex(b => b.getAttribute('data-uri') === currentUri);
+    const prevBtn = idx > 0 ? list[idx - 1] : list[list.length - 1];
+    return prevBtn?.getAttribute('data-uri') || null;
+  }
+  async function playNextInDom() {
+    const nextUri = getNextUri(currentTrackUri);
+    if (nextUri) await playTrack(nextUri);
+  }
+  async function playPrevInDom() {
+    const prevUri = getPrevUri(currentTrackUri);
+    if (prevUri) await playTrack(prevUri);
+  }
 
   /** --------------------------------------------------------------
    *  Avspilling
    *  -------------------------------------------------------------- */
-      async function playTrack(trackUri) {
-  try {
-    // 1) Sørg for token – og håndter not-authenticated med popup
+  async function playTrack(trackUri) {
+    const needInitOverlay = (!spotifyPlayer || !deviceId);
+    const ov = window.bspfyOverlay;
     try {
-      await ensureTokenSingleflight();
-    } catch (_) {
-      const wantAuth = confirm('You need to authenticate with Spotify to play in-page.\n\nAuthenticate now? (Cancel = open in Spotify)');
-      if (!wantAuth) {
-        const openUrl = `https://open.spotify.com/track/${trackUri.split(':').pop()}`;
-        window.open(openUrl, '_blank', 'noopener');
+      // 1) Sørg for token – og håndter not-authenticated med popup
+      try {
+        await ensureTokenSingleflight();
+      } catch (_) {
+        const wantAuth = confirm('You need to authenticate with Spotify to play in-page.\n\nAuthenticate now? (Cancel = open in Spotify)');
+        if (!wantAuth) {
+          const openUrl = `https://open.spotify.com/track/${trackUri.split(':').pop()}`;
+          window.open(openUrl, '_blank', 'noopener');
+          return;
+        }
+        await window.bspfyAuth.startAuthPopup(); // viser egen overlay
+        await ensureTokenSingleflight();
+      }
+
+      // 2) SDK/device
+      if (!spotifyPlayer || !deviceId) {
+        ov && ov.show({ title: 'Starting playback…', reason: 'playback' });
+        await initializeSpotifyPlayer(); // har egen overlay ved init
+      }
+
+      // 3) Samme spor → toggl play/pause
+      if (currentTrackUri === trackUri) {
+        try { await spotifyPlayer.togglePlay(); } catch {}
         return;
       }
-      await window.bspfyAuth.startAuthPopup();
-      await ensureTokenSingleflight();
+
+      // 4) Kø av URIs + offset til valgt spor
+      const uris = getPlaylistUris();
+      if (!uris.length) uris.push(trackUri);
+      currentTrackUri = trackUri;
+
+      const body = { uris, offset: { uri: trackUri }, position_ms: 0 };
+
+      // 5) Kall via vår gate + single-flight wrapper
+      await bspfyFetch(`https://api.spotify.com/v1/me/player/play?device_id=${encodeURIComponent(deviceId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+    } catch (e) {
+      console.error('playTrack error', e);
+      alert('Could not play the track. Please try again.');
+    } finally {
+      // Bare vi som viste overlay her – init har sin egen hide
+      if (needInitOverlay) ov && ov.hide();
     }
-
-    // 2) SDK/device
-    if (!spotifyPlayer || !deviceId) {
-      await initializeSpotifyPlayer();
-    }
-
-    // 3) Samme spor → toggl play/pause
-    if (currentTrackUri === trackUri) {
-      try { await spotifyPlayer.togglePlay(); } catch {}
-      return;
-    }
-
-    // 4) Kø av URIs + offset til valgt spor
-    const uris = getPlaylistUris();
-    if (!uris.length) uris.push(trackUri);
-    currentTrackUri = trackUri;
-
-    const body = { uris, offset: { uri: trackUri }, position_ms: 0 };
-
-    // 5) Kall via vår gate + single-flight wrapper
-    await bspfyFetch(`https://api.spotify.com/v1/me/player/play?device_id=${encodeURIComponent(deviceId)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-
-  } catch (e) {
-    console.error('playTrack error', e);
-    alert('Could not play the track. Please try again.');
   }
-}
-
-
 
   /** --------------------------------------------------------------
    *  SEEK / HOVER / SCRUB
@@ -671,69 +680,61 @@ async function playPrevInDom() {
       .on('click',      clickSeek);
   }
 
-// ---- Auto-ellipsis + scroll-on-hover for overflowende tekst ----
-(function() {
-  function prepareScrollable(el) {
-    if (!el) return;
-    // Sett default én linje + scroll-container
-    el.classList.add('bspfy-one-line', 'bspfy-scroll');
+  // ---- Auto-ellipsis + scroll-on-hover for overflowende tekst ----
+  (function() {
+    function prepareScrollable(el) {
+      if (!el) return;
+      // Sett default én linje + scroll-container
+      el.classList.add('bspfy-one-line', 'bspfy-scroll');
 
-    // Ikke wrap flere ganger
-    if (el.querySelector('.bspfy-scroll-inner')) return;
+      // Ikke wrap flere ganger
+      if (el.querySelector('.bspfy-scroll-inner')) return;
 
-    const inner = document.createElement('span');
-    inner.className = 'bspfy-scroll-inner';
-    inner.textContent = el.textContent;
-    el.textContent = '';
-    el.appendChild(inner);
+      const inner = document.createElement('span');
+      inner.className = 'bspfy-scroll-inner';
+      inner.textContent = el.textContent;
+      el.textContent = '';
+      el.appendChild(inner);
 
-    function needsScroll() {
-      return inner.scrollWidth > el.clientWidth + 1;
+      function needsScroll() {
+        return inner.scrollWidth > el.clientWidth + 1;
+      }
+
+      function startScroll() {
+        if (!needsScroll()) return;
+        const delta = inner.scrollWidth - el.clientWidth;
+        const duration = Math.max(4, Math.min(15, delta / 30)); // 30px/s, clamp 4–15s
+        inner.style.transition = `transform ${duration}s linear`;
+        inner.style.transform = `translateX(${-delta}px)`;
+      }
+
+      function resetScroll() {
+        inner.style.transition = 'transform .35s ease-out';
+        inner.style.transform = 'translateX(0)';
+      }
+
+      el.addEventListener('mouseenter', startScroll);
+      el.addEventListener('mouseleave', resetScroll);
+      window.addEventListener('resize', resetScroll);
     }
 
-    function startScroll() {
-      if (!needsScroll()) return;
-      const delta = inner.scrollWidth - el.clientWidth;
-      const duration = Math.max(4, Math.min(15, delta / 30)); // 30px/s, clamp 4–15s
-      inner.style.transition = `transform ${duration}s linear`;
-      inner.style.transform = `translateX(${-delta}px)`;
-    }
+    // Gjør tilgjengelig slik at du kan trigge etter UI-oppdateringer
+    window.bspfyRefreshScroll = function() {
+      // Spiller-felter
+      prepareScrollable(document.getElementById('bspfy-pl1-album-name'));
+      prepareScrollable(document.getElementById('bspfy-pl1-track-name'));
 
-    function resetScroll() {
-      inner.style.transition = 'transform .35s ease-out';
-      inner.style.transform = 'translateX(0)';
-    }
-
-    el.addEventListener('mouseenter', startScroll);
-    el.addEventListener('mouseleave', resetScroll);
-    window.addEventListener('resize', resetScroll);
-  }
-
-  // Gjør tilgjengelig slik at du kan trigge etter UI-oppdateringer
-  window.bspfyRefreshScroll = function() {
-    // Spiller-felter
-    prepareScrollable(document.getElementById('bspfy-pl1-album-name'));
-    prepareScrollable(document.getElementById('bspfy-pl1-track-name'));
-
-    // Grid (tittel + album – juster selektor ved behov)
-    document.querySelectorAll('.bspfy-track-item .track-info > *').forEach(prepareScrollable);
-  };
-})();
+      // Grid (tittel + album – juster selektor ved behov)
+      document.querySelectorAll('.bspfy-track-item .track-info > *').forEach(prepareScrollable);
+    };
+  })();
 
   /** --------------------------------------------------------------
    *  DOM Ready – wiring
    *  -------------------------------------------------------------- */
   document.addEventListener('DOMContentLoaded', function () {
-    // Bind seek/hover (riktig funksjon)
-    setupSeek(); // ⬅️ NB: ikke kall bindSeeking(); den er kommentert ut
-
-    // // Rad-ikoner
-    // document.querySelectorAll('.bspfy-play-icon').forEach(btn => {
-    //   btn.addEventListener('click', () => {
-    //     const uri = btn.getAttribute('data-uri');
-    //     if (uri) playTrack(uri);
-    //   });
-    // });
+    // Bind seek/hover
+    setupSeek();
 
     // Hoved play/pause
     document.getElementById('bspfy-pl1-play-pause-button')?.addEventListener('click', async () => {
@@ -748,62 +749,63 @@ async function playPrevInDom() {
       }
       try { await spotifyPlayer.togglePlay(); } catch {}
     });
-// Hele raden klikker for play i LIST-tema (også card hvis du ønsker)
-const grid = document.querySelector('.bspfy-playlist-grid');
-if (grid) {
-  // Play på klikk, men ikke når vi klikker på lenker/meny
-  grid.addEventListener('click', (e) => {
-    if (
-      e.target.closest('.bspfy-more') ||
-      e.target.closest('.bspfy-more-menu') ||
-      e.target.closest('a')
-    ) return;
 
-    const row = e.target.closest('.bspfy-list-item[data-uri], .bspfy-track-item[data-uri]');
-    if (!row) return;
-    const uri = row.getAttribute('data-uri') ||
-                row.querySelector('.bspfy-play-icon')?.getAttribute('data-uri');
-    if (uri) playTrack(uri);
-  });
+    // Hele raden klikker for play (list & card)
+    const grid = document.querySelector('.bspfy-playlist-grid');
+    if (grid) {
+      // Play på klikk, men ikke når vi klikker på lenker/meny
+      grid.addEventListener('click', (e) => {
+        if (
+          e.target.closest('.bspfy-more') ||
+          e.target.closest('.bspfy-more-menu') ||
+          e.target.closest('a')
+        ) return;
 
-  // Enter/Space for tastatur
-  grid.addEventListener('keydown', (e) => {
-    const row = e.target.closest('.bspfy-list-item[data-uri]');
-    if (!row) return;
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      const uri = row.getAttribute('data-uri');
-      if (uri) playTrack(uri);
+        const row = e.target.closest('.bspfy-list-item[data-uri], .bspfy-track-item[data-uri]');
+        if (!row) return;
+        const uri = row.getAttribute('data-uri') ||
+                    row.querySelector('.bspfy-play-icon')?.getAttribute('data-uri');
+        if (uri) playTrack(uri);
+      });
+
+      // Enter/Space for tastatur
+      grid.addEventListener('keydown', (e) => {
+        const row = e.target.closest('.bspfy-list-item[data-uri]');
+        if (!row) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          const uri = row.getAttribute('data-uri');
+          if (uri) playTrack(uri);
+        }
+      });
+
+      // Kjøttbollemeny toggle
+      grid.addEventListener('click', (e) => {
+        const btn = e.target.closest('.bspfy-more');
+        if (!btn) return;
+        const menu = btn.parentElement.querySelector('.bspfy-more-menu');
+        const open = menu.hasAttribute('hidden');
+        document.querySelectorAll('.bspfy-more-menu').forEach(m => m.setAttribute('hidden',''));
+        document.querySelectorAll('.bspfy-more').forEach(b => b.setAttribute('aria-expanded','false'));
+        if (open) { menu.removeAttribute('hidden'); btn.setAttribute('aria-expanded','true'); }
+      });
+
+      // Klikk utenfor lukker alle menyer
+      document.addEventListener('click', (ev) => {
+        if (!ev.target.closest('.bspfy-more') && !ev.target.closest('.bspfy-more-menu')) {
+          document.querySelectorAll('.bspfy-more-menu').forEach(m => m.setAttribute('hidden',''));
+          document.querySelectorAll('.bspfy-more').forEach(b => b.setAttribute('aria-expanded','false'));
+        }
+      });
     }
-  });
-
-  // Kjøttbollemeny toggle
-  grid.addEventListener('click', (e) => {
-    const btn = e.target.closest('.bspfy-more');
-    if (!btn) return;
-    const menu = btn.parentElement.querySelector('.bspfy-more-menu');
-    const open = menu.hasAttribute('hidden');
-    document.querySelectorAll('.bspfy-more-menu').forEach(m => m.setAttribute('hidden',''));
-    document.querySelectorAll('.bspfy-more').forEach(b => b.setAttribute('aria-expanded','false'));
-    if (open) { menu.removeAttribute('hidden'); btn.setAttribute('aria-expanded','true'); }
-  });
-
-  // Klikk utenfor lukker alle menyer
-  document.addEventListener('click', (ev) => {
-    if (!ev.target.closest('.bspfy-more') && !ev.target.closest('.bspfy-more-menu')) {
-      document.querySelectorAll('.bspfy-more-menu').forEach(m => m.setAttribute('hidden',''));
-      document.querySelectorAll('.bspfy-more').forEach(b => b.setAttribute('aria-expanded','false'));
-    }
-  });
-}
 
     document.getElementById('bspfy-pl1-play-next')?.addEventListener('click', async () => {
-  try { await spotifyPlayer.nextTrack(); } catch (_) {}
-});
+      try { await spotifyPlayer.nextTrack(); } catch (_) {}
+    });
 
-document.getElementById('bspfy-pl1-play-previous')?.addEventListener('click', async () => {
-  try { await spotifyPlayer.previousTrack(); } catch (_) {}
-});
+    document.getElementById('bspfy-pl1-play-previous')?.addEventListener('click', async () => {
+      try { await spotifyPlayer.previousTrack(); } catch (_) {}
+    });
 
     // Valgfri auth-knapp
     document.getElementById('bspfy-auth-button')?.addEventListener('click', async () => {
@@ -816,127 +818,125 @@ document.getElementById('bspfy-pl1-play-previous')?.addEventListener('click', as
         await window.bspfyAuth.fetchJSON(`${window.location.origin}/wp-json/bspfy/v1/oauth/token`);
       } catch {}
     })();
-  
+
     window.bspfyRefreshScroll();
-});
-
-// ---- Dock (device + volume) ----
-(function() {
-  const root     = document.querySelector('.bspfy-dock-container');
-  if (!root) return;
-
-  const devBtn   = root.querySelector('#bspfy-dock-deviceBtn');
-  const devMenuW = root.querySelector('#bspfy-dock-deviceMenu');
-  const devList  = devMenuW?.querySelector('.bspfy-mini-devices');
-
-  const volBtn   = root.querySelector('#bspfy-dock-volumeBtn');
-  const volPop   = root.querySelector('#bspfy-dock-volumePopover');
-  const volRange = root.querySelector('#bspfy-dock-volumeRange');
-
-  let localId = null;
-  let selectedId = null;
-
-  document.addEventListener('bspfy:player_ready', (e) => {
-    localId = e.detail.deviceId;
-    if (!selectedId) selectedId = localId;
   });
 
-  // --- helpers ---
-  const isOpen  = (el) => el && !el.hasAttribute('hidden');
-  const openEl  = (el, btn) => { el?.removeAttribute('hidden'); btn?.setAttribute('aria-expanded','true'); };
-  const closeEl = (el, btn) => { el?.setAttribute('hidden',''); btn?.setAttribute('aria-expanded','false'); };
-  const closeAll = () => { closeEl(devMenuW, devBtn); closeEl(volPop, volBtn); };
+  // ---- Dock (device + volume) ----
+  (function() {
+    const root     = document.querySelector('.bspfy-dock-container');
+    if (!root) return;
 
-  async function renderDevices() {
-    if (!devList) return;
-    devList.innerHTML = '<button class="bspfy-mini-devices-row" disabled>Laster enheter…</button>';
-    try {
-      const data = await bspfyApi.devices();
-      const devices = Array.isArray(data?.devices) ? data.devices : [];
-      if (!devices.length) {
-        devList.innerHTML = '<button class="bspfy-mini-devices-row" disabled>Ingen enheter funnet. Åpne Spotify-appen.</button>';
-        return;
+    const devBtn   = root.querySelector('#bspfy-dock-deviceBtn');
+    const devMenuW = root.querySelector('#bspfy-dock-deviceMenu');
+    const devList  = devMenuW?.querySelector('.bspfy-mini-devices');
+
+    const volBtn   = root.querySelector('#bspfy-dock-volumeBtn');
+    const volPop   = root.querySelector('#bspfy-dock-volumePopover');
+    const volRange = root.querySelector('#bspfy-dock-volumeRange');
+
+    let localId = null;
+    let selectedId = null;
+
+    document.addEventListener('bspfy:player_ready', (e) => {
+      localId = e.detail.deviceId;
+      if (!selectedId) selectedId = localId;
+    });
+
+    // --- helpers ---
+    const isOpen  = (el) => el && !el.hasAttribute('hidden');
+    const openEl  = (el, btn) => { el?.removeAttribute('hidden'); btn?.setAttribute('aria-expanded','true'); };
+    const closeEl = (el, btn) => { el?.setAttribute('hidden',''); btn?.setAttribute('aria-expanded','false'); };
+    const closeAll = () => { closeEl(devMenuW, devBtn); closeEl(volPop, volBtn); };
+
+    async function renderDevices() {
+      if (!devList) return;
+      devList.innerHTML = '<button class="bspfy-mini-devices-row" disabled>Laster enheter…</button>';
+      try {
+        const data = await bspfyApi.devices();
+        const devices = Array.isArray(data?.devices) ? data.devices : [];
+        if (!devices.length) {
+          devList.innerHTML = '<button class="bspfy-mini-devices-row" disabled>Ingen enheter funnet. Åpne Spotify-appen.</button>';
+          return;
+        }
+        devList.innerHTML = devices.map(d => {
+          const sel = (selectedId || localId) === d.id;
+          return `<button class="bspfy-mini-devices-row${sel?' selected':''}" data-id="${d.id}">
+                    <span class="bspfy-dot${d.is_active?' on':''}"></span>${d.name || d.type}
+                  </button>`;
+        }).join('');
+      } catch (e) {
+        devList.innerHTML = `<button class="bspfy-mini-devices-row bspfy-error" disabled>
+          Kunne ikke hente enheter (${e.status||''})
+        </button>`;
       }
-      devList.innerHTML = devices.map(d => {
-        const sel = (selectedId || localId) === d.id;
-        return `<button class="bspfy-mini-devices-row${sel?' selected':''}" data-id="${d.id}">
-                  <span class="bspfy-dot${d.is_active?' on':''}"></span>${d.name || d.type}
-                </button>`;
-      }).join('');
-    } catch (e) {
-      devList.innerHTML = `<button class="bspfy-mini-devices-row bspfy-error" disabled>
-        Kunne ikke hente enheter (${e.status||''})
-      </button>`;
     }
-  }
 
-  // --- toggles ---
-  devBtn?.addEventListener('click', async (e) => {
-    e.stopPropagation();
-    const willOpen = !isOpen(devMenuW);
-    closeEl(volPop, volBtn);             // lukk den andre først
-    if (willOpen) {
-      openEl(devMenuW, devBtn);
-      await renderDevices();
-    } else {
+    // --- toggles ---
+    devBtn?.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const willOpen = !isOpen(devMenuW);
+      closeEl(volPop, volBtn);             // lukk den andre først
+      if (willOpen) {
+        openEl(devMenuW, devBtn);
+        await renderDevices();
+      } else {
+        closeEl(devMenuW, devBtn);
+      }
+    });
+
+    devList?.addEventListener('click', async (e) => {
+      const row = e.target.closest('.bspfy-mini-devices-row[data-id]');
+      if (!row) return;
+      try {
+        await bspfyApi.transfer(row.getAttribute('data-id'), true);
+        selectedId = row.getAttribute('data-id');
+        closeAll();
+      } catch {}
+    });
+
+    volBtn?.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const willOpen = !isOpen(volPop);
       closeEl(devMenuW, devBtn);
-    }
-  });
+      if (willOpen) {
+        openEl(volPop, volBtn);
+        // sync volum når vi åpner
+        try {
+          if (selectedId && localId && selectedId !== localId) {
+            const me = await bspfyApi.mePlayer();
+            const v = Math.max(0, Math.min(100, me?.device?.volume_percent ?? 50)) / 100;
+            volRange.value = String(v);
+          } else if (window.spotifyPlayer) {
+            const v = await window.spotifyPlayer.getVolume();
+            if (typeof v === 'number') volRange.value = String(v);
+          }
+        } catch {}
+      } else {
+        closeEl(volPop, volBtn);
+      }
+    });
 
-  devList?.addEventListener('click', async (e) => {
-    const row = e.target.closest('.bspfy-mini-devices-row[data-id]');
-    if (!row) return;
-    try {
-      await bspfyApi.transfer(row.getAttribute('data-id'), true);
-      selectedId = row.getAttribute('data-id');
-      closeAll();
-    } catch {}
-  });
-
-  volBtn?.addEventListener('click', async (e) => {
-    e.stopPropagation();
-    const willOpen = !isOpen(volPop);
-    closeEl(devMenuW, devBtn);
-    if (willOpen) {
-      openEl(volPop, volBtn);
-      // sync volum når vi åpner
+    volRange?.addEventListener('input', async (e) => {
+      const v = Number(e.target.value);
       try {
         if (selectedId && localId && selectedId !== localId) {
-          const me = await bspfyApi.mePlayer();
-          const v = Math.max(0, Math.min(100, me?.device?.volume_percent ?? 50)) / 100;
-          volRange.value = String(v);
+          await bspfyApi.setRemoteVolume(selectedId, v);
         } else if (window.spotifyPlayer) {
-          const v = await window.spotifyPlayer.getVolume();
-          if (typeof v === 'number') volRange.value = String(v);
+          await window.spotifyPlayer.setVolume(v);
         }
       } catch {}
-    } else {
-      closeEl(volPop, volBtn);
-    }
-  });
+    });
 
-  volRange?.addEventListener('input', async (e) => {
-    const v = Number(e.target.value);
-    try {
-      if (selectedId && localId && selectedId !== localId) {
-        await bspfyApi.setRemoteVolume(selectedId, v);
-      } else if (window.spotifyPlayer) {
-        await window.spotifyPlayer.setVolume(v);
-      }
-    } catch {}
-  });
+    // Lukk ved klikk hvor som helst utenfor kontrollene
+    document.addEventListener('click', (ev) => {
+      if (!ev.target.closest('.bspfy-dock-ctl')) closeAll();
+    });
 
-  // Lukk ved klikk hvor som helst utenfor kontrollene (ikke bare utenfor hele spilleren)
-  document.addEventListener('click', (ev) => {
-    if (!ev.target.closest('.bspfy-dock-ctl')) closeAll();
-  });
-
-  // Lukk på Escape
-  document.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape') closeAll();
-  });
-})();
-
-
+    // Lukk på Escape
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') closeAll();
+    });
+  })();
 
 })(jQuery);

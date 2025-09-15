@@ -1,177 +1,383 @@
 <?php
+/**
+ * Spotify Web API helper for BeTA iT – Spotify Playlist.
+ *
+ * Provides thin wrappers around common calls and input handling:
+ * - Extract Bearer tokens from headers (user tokens via PKCE)
+ * - Fallback to Client Credentials when no user token is present
+ * - Search tracks/artists/albums with optional market handling
+ * - Defensive logging without leaking tokens
+ *
+ * @package   Betait_Spfy_Playlist
+ * @subpackage Betait_Spfy_Playlist/includes
+ * @since     1.0.0
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * Class Betait_Spfy_Playlist_API_Handler
+ *
+ * Notes:
+ * - Uses user Bearer when available (best results, market=from_token).
+ * - Falls back to Client Credentials (no user context), with market fallback (default "NO").
+ * - Returns arrays shaped like: ['success' => bool, 'data' => mixed ].
+ */
 class Betait_Spfy_Playlist_API_Handler {
 
-    private $api_base = 'https://api.spotify.com/v1/';
-    private $client_id;
-    private $client_secret;
+	/**
+	 * Spotify Web API base URL.
+	 *
+	 * @var string
+	 */
+	private $api_base = 'https://api.spotify.com/v1/';
 
-    public function __construct() {
-        $this->client_id     = get_option( 'bspfy_client_id', '' );
-        $this->client_secret = get_option( 'bspfy_client_secret', '' );
-    }
+	/**
+	 * Spotify Client ID (for client_credentials fallback).
+	 *
+	 * @var string
+	 */
+	private $client_id;
 
-    private function log_debug( $message ) {
-        if ( get_option( 'bspfy_debug', 0 ) ) {
-            error_log( '[BeTA iT - Spfy Playlist API Debug] ' . $message );
-        }
-    }
+	/**
+	 * Spotify Client Secret (for client_credentials fallback).
+	 *
+	 * @var string
+	 */
+	private $client_secret;
 
-    private function credentials_are_set() {
-        return ! empty( $this->client_id ) && ! empty( $this->client_secret );
-    }
+	/**
+	 * Constructor: load saved credentials (if any).
+	 */
+	public function __construct() {
+		$this->client_id     = (string) get_option( 'bspfy_client_id', '' );
+		$this->client_secret = (string) get_option( 'bspfy_client_secret', '' );
+	}
 
-    /** NEW: prøv å lese Bearer-token fra request headers */
-        private function get_bearer_from_request() {
-            $hdr = '';
-            if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-                $hdr = $_SERVER['HTTP_AUTHORIZATION'];
-            } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
-                $hdr = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
-            } elseif (function_exists('getallheaders')) {
-                $all = getallheaders();
-                if (!empty($all['Authorization'])) $hdr = $all['Authorization'];
-            }
-            if ($hdr && stripos($hdr, 'Bearer ') === 0) {
-                return trim(substr($hdr, 7));
-            }
-            return '';
-        }
+	/**
+	 * Conditional debug logger (redacts Bearer tokens).
+	 *
+	 * @param string $message Log message.
+	 * @param mixed  $context Optional extra data (will be json_encoded).
+	 * @return void
+	 */
+	private function log_debug( $message, $context = null ) {
+		if ( (int) get_option( 'bspfy_debug', 0 ) !== 1 ) {
+			return;
+		}
 
+		$redact = static function( $str ) {
+			$str = (string) $str;
+			return preg_replace( '/Bearer\s+[A-Za-z0-9._~+\/=-]+/i', 'Bearer [REDACTED]', $str );
+		};
 
-    /** (valgfritt) fortsatt tilgjengelig for fallback */
-    private function get_access_token_client_credentials() {
-        if (!$this->credentials_are_set()) {
-            return array( 'error' => __( 'Spotify API credentials are not set.', 'betait-spfy-playlist' ) );
-        }
-        $resp = wp_remote_post('https://accounts.spotify.com/api/token', array(
-            'body' => array( 'grant_type' => 'client_credentials' ),
-            'headers' => array(
-                'Authorization' => 'Basic ' . base64_encode( $this->client_id . ':' . $this->client_secret ),
-            ),
-        ));
-        if (is_wp_error($resp)) return array( 'error' => 'Error connecting to Spotify API.' );
-        $data = json_decode(wp_remote_retrieve_body($resp), true);
-        return $data['access_token'] ?? array( 'error' => 'Unable to fetch access token.' );
-    }
+		$prefix = '[BSPFY API] ';
+		if ( null === $context ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			error_log( $prefix . $redact( $message ) );
+			return;
+		}
 
-    /** Oppdatert – bruker Bearer hvis mulig, ellers fallback */
-    //public function search_tracks( $query, $access_token = null ) {
-        public function search_tracks( $query, $access_token = null, $type_str = 'track', $limit = 20 ) {
-            $query = trim((string)$query);
-            $limit = max(1, min(50, (int)$limit)); // Spotify tillater opptil 50
+		$ctx = wp_json_encode( $context );
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		error_log( $prefix . $redact( $message ) . ' | ' . $redact( (string) $ctx ) );
+	}
 
-            // Sjekk om kall kom med brukertoken (fra header) – det avgjør 'market'
-            $have_user_bearer = !empty($this->get_bearer_from_request());
+	/**
+	 * True if both Client ID and Secret are present.
+	 *
+	 * @return bool
+	 */
+	private function credentials_are_set() {
+		return $this->client_id !== '' && $this->client_secret !== '';
+	}
 
-            // 1) Bearer fra param eller request
-            if (!$access_token) {
-                $access_token = $this->get_bearer_from_request();
-            }
+	/**
+	 * Extract Authorization: Bearer <token> from the current request.
+	 *
+	 * @return string Empty string when not present.
+	 */
+	private function get_bearer_from_request() {
+		$hdr = '';
+		if ( isset( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
+			$hdr = (string) $_SERVER['HTTP_AUTHORIZATION'];
+		} elseif ( isset( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
+			$hdr = (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+		} elseif ( function_exists( 'getallheaders' ) ) {
+			$all = getallheaders();
+			if ( isset( $all['Authorization'] ) ) {
+				$hdr = (string) $all['Authorization'];
+			}
+		}
 
-            // 2) Fallback til client_credentials om ingen Bearer
-            if (!$access_token) {
-                $have_user_bearer = false; // vi vet vi IKKE har brukertoken
-                $this->log_debug('No Bearer in request; falling back to client_credentials for search.');
-                $tok = $this->get_access_token_client_credentials();
-                if (is_array($tok) && isset($tok['error'])) {
-                    return array('success'=>false, 'data'=>array('message'=>$tok['error']));
-                }
-                $access_token = $tok;
-            }
+		if ( $hdr && preg_match( '/Bearer\s([^\s]+)/i', $hdr, $m ) ) {
+			return sanitize_text_field( $m[1] );
+		}
+		return '';
+	}
 
-            $market = $have_user_bearer ? 'from_token' : 'NO'; // fallback-marked når vi ikke har bruker
+	/**
+	 * Obtain an app-only access token using Client Credentials flow.
+	 *
+	 * @return string|array Access token on success, or ['error' => '...'].
+	 */
+	private function get_access_token_client_credentials() {
+		if ( ! $this->credentials_are_set() ) {
+			return array( 'error' => __( 'Spotify API credentials are not set.', 'betait-spfy-playlist' ) );
+		}
 
-            // Hvilke typer ble valgt?
-            $types = array_filter(array_map('trim', explode(',', strtolower($type_str))));
-            $types = array_values(array_intersect($types, array('track','artist','album')));
-            if (!$types) $types = array('track');
+		$args = array(
+			'body'    => array( 'grant_type' => 'client_credentials' ),
+			'headers' => array(
+				'Authorization' => 'Basic ' . base64_encode( $this->client_id . ':' . $this->client_secret ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+			),
+			'timeout' => 12,
+		);
 
-            // Små hjelpere
-            $seen = array();
-            $tracks_out = array();
+		// Include a helpful UA if constants exist.
+		if ( defined( 'BETAIT_SPFY_PLAYLIST_VERSION' ) ) {
+			$args['user-agent'] = 'BSPFY/' . BETAIT_SPFY_PLAYLIST_VERSION . ( defined( 'BETAIT_SPFY_PLAYLIST_FILE' ) ? ' (' . plugin_basename( BETAIT_SPFY_PLAYLIST_FILE ) . ')' : '' );
+		}
 
-            $http_get = function($url) use ($access_token) {
-                $resp = wp_remote_get($url, array(
-                    'headers' => array('Authorization' => 'Bearer ' . $access_token),
-                    'timeout' => 12,
-                ));
-                if (is_wp_error($resp)) return array(null, $resp->get_error_message());
-                $code = wp_remote_retrieve_response_code($resp);
-                $body = json_decode(wp_remote_retrieve_body($resp), true);
-                return array($code === 200 ? $body : null, $code);
-            };
+		$resp = wp_remote_post( 'https://accounts.spotify.com/api/token', $args );
 
-            $add_track = function($t) use (&$tracks_out, &$seen) {
-                if (empty($t['id']) || isset($seen[$t['id']])) return;
-                $seen[$t['id']] = true;
-                $tracks_out[] = $t;
-            };
+		if ( is_wp_error( $resp ) ) {
+			$this->log_debug( 'client_credentials error', $resp->get_error_message() );
+			return array( 'error' => __( 'Error connecting to Spotify Accounts service.', 'betait-spfy-playlist' ) );
+		}
 
-            // 1) Direkte track-søk
-            if (in_array('track', $types, true)) {
-                $q = array(
-                    'q'      => $query,
-                    'type'   => 'track',
-                    'limit'  => $limit,
-                    'market' => $market, // 'from_token' gir bedre treffbarhet ift. tilgjengelighet
-                );
-                $url = $this->api_base . 'search?' . http_build_query($q);
-                list($data,) = $http_get($url);
-                if (!empty($data['tracks']['items'])) {
-                    foreach ($data['tracks']['items'] as $t) $add_track($t);
-                }
-            }
+		$code = (int) wp_remote_retrieve_response_code( $resp );
+		$body = json_decode( (string) wp_remote_retrieve_body( $resp ), true );
 
-            // 2) Artist → hent topp-spor for treffende artister
-            if (in_array('artist', $types, true)) {
-                $q = array('q' => $query, 'type' => 'artist', 'limit' => 3);
-                $url = $this->api_base . 'search?' . http_build_query($q);
-                list($data,) = $http_get($url);
+		if ( 200 !== $code || empty( $body['access_token'] ) ) {
+			$this->log_debug( 'client_credentials unexpected response', compact( 'code', 'body' ) );
+			return array( 'error' => __( 'Unable to fetch access token (client credentials).', 'betait-spfy-playlist' ) );
+		}
 
-                if (!empty($data['artists']['items'])) {
-                    foreach ($data['artists']['items'] as $a) {
-                        if (empty($a['id'])) continue;
-                        $urlTop = $this->api_base . 'artists/' . rawurlencode($a['id']) . '/top-tracks?' . http_build_query(array('market'=>$market));
-                        list($tops,) = $http_get($urlTop);
-                        if (!empty($tops['tracks'])) {
-                            foreach ($tops['tracks'] as $t) $add_track($t);
-                        }
-                    }
-                }
-            }
+		return (string) $body['access_token'];
+	}
 
-            // 3) Album → hent tracks for treffende album, og sett album-cover inn på hvert track
-            if (in_array('album', $types, true)) {
-                $q = array('q' => $query, 'type' => 'album', 'limit' => 3, 'market' => $market);
-                $url = $this->api_base . 'search?' . http_build_query($q);
-                list($data,) = $http_get($url);
+	/**
+	 * Perform a GET request to the Spotify Web API with Bearer auth.
+	 *
+	 * Handles basic 429 backoff if Retry-After is present.
+	 *
+	 * @param string $url          Full API URL.
+	 * @param string $access_token Bearer token.
+	 * @return array [ array|null $json, int $status_code ]
+	 */
+	private function http_get( $url, $access_token ) {
+		$args = array(
+			'headers' => array( 'Authorization' => 'Bearer ' . $access_token ),
+			'timeout' => 12,
+		);
 
-                if (!empty($data['albums']['items'])) {
-                    foreach ($data['albums']['items'] as $alb) {
-                        if (empty($alb['id'])) continue;
-                        $cover = $alb['images'] ?? array();
-                        $urlAlb = $this->api_base . 'albums/' . rawurlencode($alb['id']) . '/tracks?' . http_build_query(array('limit'=> min(10,$limit), 'market'=>$market));
-                        list($albtracks,) = $http_get($urlAlb);
-                        if (!empty($albtracks['items'])) {
-                            foreach ($albtracks['items'] as $t) {
-                                if (empty($t['album'])) {
-                                    // berik med albumets navn/cover så UI ditt kan vise bilde
-                                    $t['album'] = array(
-                                        'name'   => $alb['name'] ?? '',
-                                        'images' => $cover,
-                                    );
-                                } elseif (empty($t['album']['images'])) {
-                                    $t['album']['images'] = $cover;
-                                }
-                                $add_track($t);
-                            }
-                        }
-                    }
-                }
-            }
+		if ( defined( 'BETAIT_SPFY_PLAYLIST_VERSION' ) ) {
+			$args['user-agent'] = 'BSPFY/' . BETAIT_SPFY_PLAYLIST_VERSION . ( defined( 'BETAIT_SPFY_PLAYLIST_FILE' ) ? ' (' . plugin_basename( BETAIT_SPFY_PLAYLIST_FILE ) . ')' : '' );
+		}
 
-            // Ferdig
-            return array('success'=>true, 'data'=>array('tracks' => array_values($tracks_out)));
-        }
+		$resp = wp_remote_get( $url, $args );
 
+		if ( is_wp_error( $resp ) ) {
+			$this->log_debug( 'http_get WP_Error', $resp->get_error_message() );
+			return array( null, 0 );
+		}
+
+		$code = (int) wp_remote_retrieve_response_code( $resp );
+
+		// Handle simple 429 backoff (single retry).
+		if ( 429 === $code ) {
+			$headers     = wp_remote_retrieve_headers( $resp );
+			$retry_after = 1;
+			if ( isset( $headers['retry-after'] ) ) {
+				$retry_after = max( 1, (int) $headers['retry-after'] );
+			}
+			sleep( $retry_after );
+			$resp = wp_remote_get( $url, $args );
+			if ( is_wp_error( $resp ) ) {
+				return array( null, 0 );
+			}
+			$code = (int) wp_remote_retrieve_response_code( $resp );
+		}
+
+		$body = json_decode( (string) wp_remote_retrieve_body( $resp ), true );
+
+		return array( ( 200 === $code ? $body : null ), $code );
+	}
+
+	/**
+	 * Search Spotify for tracks (and optionally via artist/album paths).
+	 *
+	 * Strategy:
+	 * - If a user Bearer is available (header or param), use that and set market=from_token.
+	 * - If not, fall back to client credentials and use a default market (filterable, default "NO").
+	 * - Supports comma-separated $type_str of: track,artist,album.
+	 *
+	 * @param string      $query        The query string.
+	 * @param string|null $access_token Optional explicit bearer token (otherwise inferred from request).
+	 * @param string      $type_str     Comma-separated types (track,artist,album). Default 'track'.
+	 * @param int         $limit        Max results per API call (1–50). Default 20.
+	 * @return array { success: bool, data: array{ tracks: array }|array{ message: string } }
+	 */
+	public function search_tracks( $query, $access_token = null, $type_str = 'track', $limit = 20 ) {
+		$query = trim( (string) $query );
+		$limit = max( 1, min( 50, (int) $limit ) );
+
+		// Determine whether this call came with a user token.
+		$header_bearer      = $this->get_bearer_from_request();
+		$have_user_bearer   = $header_bearer !== '';
+		$effective_bearer   = $access_token ?: $header_bearer;
+
+		// Fallback to client credentials if no bearer present.
+		if ( '' === (string) $effective_bearer ) {
+			$have_user_bearer = false;
+			$this->log_debug( 'No Bearer in request; falling back to client_credentials for search.' );
+
+			$tok = $this->get_access_token_client_credentials();
+			if ( is_array( $tok ) && isset( $tok['error'] ) ) {
+				return array(
+					'success' => false,
+					'data'    => array( 'message' => (string) $tok['error'] ),
+				);
+			}
+			$effective_bearer = (string) $tok;
+		}
+
+		// Market handling: use from_token when user bearer is available.
+		$default_market = 'NO';
+		/**
+		 * Filter the default Spotify market used when no user token is present.
+		 *
+		 * @param string $market Default market (2-letter ISO 3166-1 alpha-2). Default 'NO'.
+		 */
+		$default_market = apply_filters( 'bspfy_default_market', $default_market );
+
+		$market = $have_user_bearer ? 'from_token' : $default_market;
+
+		// Types: sanitize and clamp to allowed set.
+		$types = array_filter(
+			array_map(
+				'trim',
+				explode( ',', strtolower( (string) $type_str ) )
+			)
+		);
+		$types = array_values( array_intersect( $types, array( 'track', 'artist', 'album' ) ) );
+		if ( empty( $types ) ) {
+			$types = array( 'track' );
+		}
+
+		$tracks_out = array();
+		$seen       = array();
+
+		$add_track = static function ( $t ) use ( &$tracks_out, &$seen ) {
+			if ( empty( $t['id'] ) || isset( $seen[ $t['id'] ] ) ) {
+				return;
+			}
+			$seen[ $t['id'] ] = true;
+			$tracks_out[]     = $t;
+		};
+
+		// 1) Direct track search.
+		if ( in_array( 'track', $types, true ) ) {
+			$q   = array(
+				'q'      => $query,
+				'type'   => 'track',
+				'limit'  => $limit,
+				'market' => $market,
+			);
+			$url = $this->api_base . 'search?' . http_build_query( $q, '', '&', PHP_QUERY_RFC3986 );
+			list( $data, $code ) = $this->http_get( $url, $effective_bearer );
+			if ( 200 === $code && ! empty( $data['tracks']['items'] ) ) {
+				foreach ( $data['tracks']['items'] as $t ) {
+					$add_track( $t );
+				}
+			}
+		}
+
+		// 2) Artist → top-tracks for a few best matches.
+		if ( in_array( 'artist', $types, true ) ) {
+			$q   = array(
+				'q'    => $query,
+				'type' => 'artist',
+				'limit'=> 3,
+			);
+			$url = $this->api_base . 'search?' . http_build_query( $q, '', '&', PHP_QUERY_RFC3986 );
+			list( $data, $code ) = $this->http_get( $url, $effective_bearer );
+
+			if ( 200 === $code && ! empty( $data['artists']['items'] ) ) {
+				foreach ( $data['artists']['items'] as $a ) {
+					if ( empty( $a['id'] ) ) {
+						continue;
+					}
+					$url_top = $this->api_base . 'artists/' . rawurlencode( (string) $a['id'] ) . '/top-tracks?' . http_build_query(
+						array( 'market' => $market ),
+						'',
+						'&',
+						PHP_QUERY_RFC3986
+					);
+					list( $tops, $code_t ) = $this->http_get( $url_top, $effective_bearer );
+					if ( 200 === $code_t && ! empty( $tops['tracks'] ) ) {
+						foreach ( $tops['tracks'] as $t ) {
+							$add_track( $t );
+						}
+					}
+				}
+			}
+		}
+
+		// 3) Album → expand a few albums into their tracks (enrich with album cover where missing).
+		if ( in_array( 'album', $types, true ) ) {
+			$q   = array(
+				'q'      => $query,
+				'type'   => 'album',
+				'limit'  => 3,
+				'market' => $market,
+			);
+			$url = $this->api_base . 'search?' . http_build_query( $q, '', '&', PHP_QUERY_RFC3986 );
+			list( $data, $code ) = $this->http_get( $url, $effective_bearer );
+
+			if ( 200 === $code && ! empty( $data['albums']['items'] ) ) {
+				foreach ( $data['albums']['items'] as $alb ) {
+					if ( empty( $alb['id'] ) ) {
+						continue;
+					}
+					$cover   = isset( $alb['images'] ) ? $alb['images'] : array();
+					$url_alb = $this->api_base . 'albums/' . rawurlencode( (string) $alb['id'] ) . '/tracks?' . http_build_query(
+						array(
+							'limit'  => min( 10, $limit ),
+							'market' => $market,
+						),
+						'',
+						'&',
+						PHP_QUERY_RFC3986
+					);
+					list( $albtracks, $code_a ) = $this->http_get( $url_alb, $effective_bearer );
+
+					if ( 200 === $code_a && ! empty( $albtracks['items'] ) ) {
+						foreach ( $albtracks['items'] as $t ) {
+							// Enrich minimal track payloads with album name/cover to help UI display.
+							if ( empty( $t['album'] ) ) {
+								$t['album'] = array(
+									'name'   => isset( $alb['name'] ) ? $alb['name'] : '',
+									'images' => $cover,
+								);
+							} elseif ( empty( $t['album']['images'] ) ) {
+								$t['album']['images'] = $cover;
+							}
+							$add_track( $t );
+						}
+					}
+				}
+			}
+		}
+
+		return array(
+			'success' => true,
+			'data'    => array(
+				'tracks' => array_values( $tracks_out ),
+			),
+		);
+	}
 }

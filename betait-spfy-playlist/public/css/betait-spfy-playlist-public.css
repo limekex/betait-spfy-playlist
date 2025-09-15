@@ -51,9 +51,11 @@
   
     .bspfy-header {
         grid-area: header;
-        /* background-color: #c8e6c9; /* Grønn-ish for demo */
-        /* padding: 1rem; */
         display: grid;
+        grid-template-rows: auto auto; /* tilpasses innhold */
+        grid-template-areas:
+        "header-title header-title"
+        "header-description header-image";
         grid-template-columns: 2fr 1fr;
         gap: 1rem;
     }
@@ -148,6 +150,18 @@
           "footer";
         gap: 0px;
         }
+
+        .bspfy-header {
+        grid-area: header;
+        display: grid;
+        grid-template-rows: auto auto; /* tilpasses innhold */
+        grid-template-areas:
+        "header-title "
+        "header-image"
+        "header-description";
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
       
     }
   
@@ -171,10 +185,22 @@
   
 
   .bspfy-playlist-description {
+    grid-area: header-description;
     font-size: 16px;
     line-height: 1.6;
     margin-bottom: 20px;
 }
+.bspfy-header-title {
+    grid-area: header-title;
+}
+.bspfy-header-image {
+    grid-area: header-image;
+    justify-self: end;
+    align-self: start;
+} 
+.bspfy-header-description {
+    grid-area: header-description;
+} 
 
 .bspfy-playlist-description p {
     margin-bottom: 15px;

@@ -1,0 +1,136 @@
+/* BSPFY Overlay (c) betait-spfy-playlist — kun navn med bspfy- prefix */
+.bspfy-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;                /* toggles via [data-open="true"] */
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 12, 16, 0.6);
+  backdrop-filter: blur(2px);
+  z-index: 999999;              /* over admin bar og modaler */
+}
+
+.bspfy-overlay[data-open="true"] { display: flex; }
+
+.bspfy-overlay__card {
+  min-width: clamp(260px, 40vw, 520px);
+  max-width: min(90vw, 620px);
+  color: #fff;
+  background: linear-gradient(180deg, rgba(22,24,28,.9), rgba(16,18,22,.9));
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 16px;
+  padding: 22px 22px 18px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+}
+
+.bspfy-overlay__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.bspfy-overlay__title {
+  font: 600 16px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  letter-spacing: .2px;
+}
+
+.bspfy-overlay__msg {
+  margin: 8px 0 2px;
+  font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  color: rgba(255,255,255,.9);
+}
+
+/* Equalizer (CSS-only) */
+.bspfy-eq {
+  --bar: 5px;
+  --gap: 4px;
+  --bars: 7;
+  display: inline-flex;
+  align-items: flex-end;
+  height: 26px;
+  gap: var(--gap);
+  margin-right: 2px;
+}
+
+.bspfy-eq__bar {
+  width: var(--bar);
+  height: 16px;
+  background: currentColor;
+  opacity: .9;
+  border-radius: 2px;
+  animation: bspfy-eq-bounce 900ms ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+
+/* Staggered delays for rhythm */
+.bspfy-eq__bar:nth-child(1){ animation-delay: 0ms  }
+.bspfy-eq__bar:nth-child(2){ animation-delay: 120ms}
+.bspfy-eq__bar:nth-child(3){ animation-delay: 240ms}
+.bspfy-eq__bar:nth-child(4){ animation-delay: 360ms}
+.bspfy-eq__bar:nth-child(5){ animation-delay: 480ms}
+.bspfy-eq__bar:nth-child(6){ animation-delay: 600ms}
+.bspfy-eq__bar:nth-child(7){ animation-delay: 720ms}
+
+@keyframes bspfy-eq-bounce {
+  0%, 100% { transform: scaleY(.45) }
+  50%      { transform: scaleY(1.0) }
+}
+
+/* Noter (lett pynt) */
+.bspfy-notes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.bspfy-notes::before,
+.bspfy-notes::after {
+  content: "♪";
+  position: absolute;
+  font-size: 18px;
+  color: rgba(255,255,255,.25);
+  animation: bspfy-note-float 2800ms linear infinite;
+}
+.bspfy-notes::after {
+  content: "♫";
+  left: auto;
+  right: 8%;
+  animation-duration: 3200ms;
+  animation-delay: 300ms;
+}
+@keyframes bspfy-note-float {
+  0%   { transform: translate(10%, 40%); opacity: 0 }
+  10%  { opacity: .9 }
+  90%  { opacity: .9 }
+  100% { transform: translate(0, -40%); opacity: 0 }
+}
+
+/* Footer (knapper) */
+.bspfy-overlay__footer {
+  display:flex; gap:10px; justify-content:flex-end; margin-top:14px;
+}
+.bspfy-btn {
+  appearance: none; border: 1px solid rgba(255,255,255,.2);
+  background: rgba(255,255,255,.06); color:#fff; border-radius:10px;
+  padding: 8px 12px; font: 500 13px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  cursor: pointer;
+}
+.bspfy-btn:hover { background: rgba(255,255,255,.12) }
+.bspfy-btn[hidden]{ display:none }
+
+/* States */
+.bspfy-overlay[data-state="busy"]  .bspfy-overlay__msg--error { display:none }
+.bspfy-overlay[data-state="error"] .bspfy-overlay__msg--busy  { display:none }
+.bspfy-overlay[data-state="error"] .bspfy-eq { opacity:.35 }
+
+/* Visually hidden util */
+.bspfy-sr-only {
+  position:absolute!important; width:1px!important; height:1px!important;
+  padding:0!important; margin:-1px!important; overflow:hidden!important;
+  clip:rect(0,0,0,0)!important; white-space:nowrap!important; border:0!important;
+}
+
+/* Reduced motion: disable fancy bits */
+@media (prefers-reduced-motion: reduce) {
+  .bspfy-eq__bar, .bspfy-notes::before, .bspfy-notes::after { animation: none !important }
+}

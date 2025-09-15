@@ -1,129 +1,161 @@
 <?php
-
 /**
- * Register all actions and filters for the plugin
+ * Loader for registering actions and filters in BeTA iT – Spotify Playlist.
  *
- * @link       https://betait.no
- * @since      1.0.0
+ * This class collects hooks (actions and filters) across the plugin and
+ * registers them with WordPress in a single place. It keeps the core class
+ * and feature classes tidy by delegating to this loader.
  *
  * @package    Betait_Spfy_Playlist
  * @subpackage Betait_Spfy_Playlist/includes
+ * @since      1.0.0
  */
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
- * Register all actions and filters for the plugin.
+ * Class Betait_Spfy_Playlist_Loader
  *
- * Maintain a list of all hooks that are registered throughout
- * the plugin, and register them with the WordPress API. Call the
- * run function to execute the list of actions and filters.
- *
- * @package    Betait_Spfy_Playlist
- * @subpackage Betait_Spfy_Playlist/includes
- * @author     Bjorn-Tore <bt@betait.no>
+ * Usage:
+ *   $loader = new Betait_Spfy_Playlist_Loader();
+ *   $loader->add_action( 'init', $obj, 'method_name' );
+ *   $loader->add_filter( 'the_title', $obj, 'filter_method', 10, 1 );
+ *   $loader->run();
  */
 class Betait_Spfy_Playlist_Loader {
 
 	/**
-	 * The array of actions registered with WordPress.
+	 * Actions queued for registration.
 	 *
-	 * @since    1.0.0
-	 * @access   protected
-	 * @var      array    $actions    The actions registered with WordPress to fire when the plugin loads.
+	 * @var array<int, array{hook:string, component:object, callback:string, priority:int, accepted_args:int}>
 	 */
-	protected $actions;
+	protected $actions = array();
 
 	/**
-	 * The array of filters registered with WordPress.
+	 * Filters queued for registration.
 	 *
-	 * @since    1.0.0
-	 * @access   protected
-	 * @var      array    $filters    The filters registered with WordPress to fire when the plugin loads.
+	 * @var array<int, array{hook:string, component:object, callback:string, priority:int, accepted_args:int}>
 	 */
-	protected $filters;
+	protected $filters = array();
 
 	/**
-	 * Initialize the collections used to maintain the actions and filters.
+	 * Constructor.
 	 *
-	 * @since    1.0.0
+	 * Initializes internal storage.
 	 */
 	public function __construct() {
-
 		$this->actions = array();
 		$this->filters = array();
-
 	}
 
 	/**
-	 * Add a new action to the collection to be registered with WordPress.
+	 * Queue an action to be registered with WordPress.
 	 *
-	 * @since    1.0.0
-	 * @param    string               $hook             The name of the WordPress action that is being registered.
-	 * @param    object               $component        A reference to the instance of the object on which the action is defined.
-	 * @param    string               $callback         The name of the function definition on the $component.
-	 * @param    int                  $priority         Optional. The priority at which the function should be fired. Default is 10.
-	 * @param    int                  $accepted_args    Optional. The number of arguments that should be passed to the $callback. Default is 1.
+	 * @param string $hook          WordPress action hook name.
+	 * @param object $component     Instance that defines the method.
+	 * @param string $callback      Method name on the $component.
+	 * @param int    $priority      Hook priority (default 10).
+	 * @param int    $accepted_args Number of args passed to the callback (default 1).
+	 * @return void
 	 */
 	public function add_action( $hook, $component, $callback, $priority = 10, $accepted_args = 1 ) {
 		$this->actions = $this->add( $this->actions, $hook, $component, $callback, $priority, $accepted_args );
 	}
 
 	/**
-	 * Add a new filter to the collection to be registered with WordPress.
+	 * Queue a filter to be registered with WordPress.
 	 *
-	 * @since    1.0.0
-	 * @param    string               $hook             The name of the WordPress filter that is being registered.
-	 * @param    object               $component        A reference to the instance of the object on which the filter is defined.
-	 * @param    string               $callback         The name of the function definition on the $component.
-	 * @param    int                  $priority         Optional. The priority at which the function should be fired. Default is 10.
-	 * @param    int                  $accepted_args    Optional. The number of arguments that should be passed to the $callback. Default is 1
+	 * @param string $hook          WordPress filter hook name.
+	 * @param object $component     Instance that defines the method.
+	 * @param string $callback      Method name on the $component.
+	 * @param int    $priority      Hook priority (default 10).
+	 * @param int    $accepted_args Number of args passed to the callback (default 1).
+	 * @return void
 	 */
 	public function add_filter( $hook, $component, $callback, $priority = 10, $accepted_args = 1 ) {
 		$this->filters = $this->add( $this->filters, $hook, $component, $callback, $priority, $accepted_args );
 	}
 
 	/**
-	 * A utility function that is used to register the actions and hooks into a single
-	 * collection.
+	 * Internal helper to collect hooks in a unified format.
 	 *
-	 * @since    1.0.0
-	 * @access   private
-	 * @param    array                $hooks            The collection of hooks that is being registered (that is, actions or filters).
-	 * @param    string               $hook             The name of the WordPress filter that is being registered.
-	 * @param    object               $component        A reference to the instance of the object on which the filter is defined.
-	 * @param    string               $callback         The name of the function definition on the $component.
-	 * @param    int                  $priority         The priority at which the function should be fired.
-	 * @param    int                  $accepted_args    The number of arguments that should be passed to the $callback.
-	 * @return   array                                  The collection of actions and filters registered with WordPress.
+	 * @param array  $hooks         Current collection (actions or filters).
+	 * @param string $hook          WordPress hook name.
+	 * @param object $component     Instance with the callback method.
+	 * @param string $callback      Method name on the instance.
+	 * @param int    $priority      Hook priority.
+	 * @param int    $accepted_args Number of args passed to callback.
+	 * @return array Updated collection.
 	 */
 	private function add( $hooks, $hook, $component, $callback, $priority, $accepted_args ) {
+		// Basic sanity checks; we still collect the hook to avoid surprises,
+		// but these guard against obviously broken inputs.
+		$hook     = (string) $hook;
+		$callback = (string) $callback;
 
 		$hooks[] = array(
 			'hook'          => $hook,
 			'component'     => $component,
 			'callback'      => $callback,
-			'priority'      => $priority,
-			'accepted_args' => $accepted_args
+			'priority'      => (int) $priority,
+			'accepted_args' => (int) $accepted_args,
 		);
 
 		return $hooks;
-
 	}
 
 	/**
-	 * Register the filters and actions with WordPress.
+	 * Register all queued filters and actions with WordPress.
 	 *
-	 * @since    1.0.0
+	 * @return void
 	 */
 	public function run() {
-
 		foreach ( $this->filters as $hook ) {
-			add_filter( $hook['hook'], array( $hook['component'], $hook['callback'] ), $hook['priority'], $hook['accepted_args'] );
+			// Warn early if a callback is not callable, but don't fatal.
+			if ( function_exists( '_doing_it_wrong' ) && ! is_callable( array( $hook['component'], $hook['callback'] ) ) ) {
+				_doing_it_wrong(
+					__METHOD__,
+					sprintf(
+						/* translators: 1: hook name, 2: class::method */
+						esc_html__( 'Filter "%1$s" callback "%2$s" is not callable.', 'betait-spfy-playlist' ),
+						$hook['hook'],
+						is_object( $hook['component'] ) ? get_class( $hook['component'] ) . '::' . $hook['callback'] : $hook['callback']
+					),
+					'1.0.0'
+				);
+			}
+
+			add_filter(
+				$hook['hook'],
+				array( $hook['component'], $hook['callback'] ),
+				$hook['priority'],
+				$hook['accepted_args']
+			);
 		}
 
 		foreach ( $this->actions as $hook ) {
-			add_action( $hook['hook'], array( $hook['component'], $hook['callback'] ), $hook['priority'], $hook['accepted_args'] );
+			// Warn early if a callback is not callable, but don't fatal.
+			if ( function_exists( '_doing_it_wrong' ) && ! is_callable( array( $hook['component'], $hook['callback'] ) ) ) {
+				_doing_it_wrong(
+					__METHOD__,
+					sprintf(
+						/* translators: 1: hook name, 2: class::method */
+						esc_html__( 'Action "%1$s" callback "%2$s" is not callable.', 'betait-spfy-playlist' ),
+						$hook['hook'],
+						is_object( $hook['component'] ) ? get_class( $hook['component'] ) . '::' . $hook['callback'] : $hook['callback']
+					),
+					'1.0.0'
+				);
+			}
+
+			add_action(
+				$hook['hook'],
+				array( $hook['component'], $hook['callback'] ),
+				$hook['priority'],
+				$hook['accepted_args']
+			);
 		}
-
 	}
-
 }

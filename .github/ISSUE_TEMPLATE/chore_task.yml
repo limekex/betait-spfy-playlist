@@ -1,0 +1,32 @@
+name: "🧹 Chore / Tech debt"
+description: Non-user-facing maintenance task
+title: "[Chore]: "
+labels: ["tech-debt"]
+assignees: []
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      placeholder: "Why this matters now…"
+    validations:
+      required: true
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks
+      description: Use a checklist
+      placeholder: "- [ ] …"
+      value: "- [ ] …"
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      placeholder: "Perf/security/devx…"
+  - type: textarea
+    id: ac
+    attributes:
+      label: Acceptance criteria
+      value: "- [ ] CI green\n- [ ] No regressions\n- [ ] Docs updated"

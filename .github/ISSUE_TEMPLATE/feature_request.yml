@@ -1,0 +1,50 @@
+name: "🚀 Feature request"
+description: Suggest an idea for this project
+title: "[Feature]: "
+labels: ["feature", "enhancement"]
+assignees: []
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What pain/need does this feature address?
+      placeholder: "Users can’t …"
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      placeholder: "Add … so that …"
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope & constraints
+      placeholder: "Must support X; No breaking changes to Y"
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks / unknowns
+  - type: textarea
+    id: ac
+    attributes:
+      label: Acceptance criteria
+      placeholder: "- [ ] …"
+      value: "- [ ] API/UX documented\n- [ ] Unit/E2E tests updated\n- [ ] Backwards compatible"
+  - type: input
+    id: mock
+    attributes:
+      label: Designs / mockups / references (optional)
+      placeholder: "Figma/links"
+  - type: input
+    id: epic
+    attributes:
+      label: Epic / parent issue (optional)
+      placeholder: "#123"

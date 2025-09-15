@@ -1,0 +1,80 @@
+name: "🐞 Bug report"
+description: Report a reproducible problem
+title: "[Bug]: "
+labels: ["bug", "priority/high"]
+assignees: []
+body:
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-checks
+      options:
+        - label: I searched existing issues and couldn’t find this bug
+          required: true
+        - label: This happens on the latest main branch / plugin version
+          required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area(s)
+      multiple: true
+      options:
+        - Admin (metabox/search)
+        - Public (player/playlist)
+        - OAuth/REST
+        - Build/Packaging
+        - Other
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: WordPress version, PHP version, browser/OS (if relevant)
+      placeholder: "WP 6.5.3, PHP 8.1, Chrome 126 macOS"
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: List clear steps
+      placeholder: "1) Go to ..., 2) Click ..., 3) Observe ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Screenshots / logs
+      description: Drag & drop images or paste logs here
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - CRITICAL (blocks use)
+        - MAJOR
+        - MINOR
+        - TRIVIAL
+    validations:
+      required: true
+  - type: checkboxes
+    id: regression
+    attributes:
+      label: Regression?
+      options:
+        - label: This worked in a previous version
+  - type: textarea
+    id: ac
+    attributes:
+      label: Acceptance criteria
+      description: What must be true for this to be “done”?
+      placeholder: "- [ ] …"

@@ -1,264 +1,212 @@
 <?php
-
 /**
- * The file that defines the core plugin class
+ * Core plugin class for BeTA iT – Spotify Playlist.
  *
- * A class definition that includes attributes and functions used across both the
- * public-facing side of the site and the admin area.
+ * Responsibilities:
+ * - Load dependencies (loader, i18n, admin/public, CPT, AJAX, OAuth, API handler).
+ * - Set up internationalization.
+ * - Register admin and public hooks via the Loader.
  *
- * @link       https://betait.no
- * @since      1.0.0
+ * Notes:
+ * - Pretty rewrite endpoints previously used for OAuth have been dropped.
+ *   The plugin now relies on REST routes under `/wp-json/bspfy/v1/*`.
  *
  * @package    Betait_Spfy_Playlist
  * @subpackage Betait_Spfy_Playlist/includes
+ * @since      1.0.0
  */
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
- * The core plugin class.
- *
- * This is used to define internationalization, admin-specific hooks, and
- * public-facing site hooks.
- *
- * Also maintains the unique identifier of this plugin as well as the current
- * version of the plugin.
- *
- * @since      1.0.0
- * @package    Betait_Spfy_Playlist
- * @subpackage Betait_Spfy_Playlist/includes
- * @author     Bjorn-Tore <bt@betait.no>
+ * Class Betait_Spfy_Playlist
  */
 class Betait_Spfy_Playlist {
 
 	/**
-	 * The loader that's responsible for maintaining and registering all hooks that power
-	 * the plugin.
+	 * Loader that maintains and registers all hooks for the plugin.
 	 *
-	 * @since    1.0.0
-	 * @access   protected
-	 * @var      Betait_Spfy_Playlist_Loader    $loader    Maintains and registers all hooks for the plugin.
+	 * @var Betait_Spfy_Playlist_Loader
 	 */
 	protected $loader;
 
 	/**
-	 * The unique identifier of this plugin.
+	 * Unique identifier (slug) for this plugin.
 	 *
-	 * @since    1.0.0
-	 * @access   protected
-	 * @var      string    $betait_spfy_playlist    The string used to uniquely identify this plugin.
+	 * @var string
 	 */
 	protected $betait_spfy_playlist;
 
 	/**
-	 * The current version of the plugin.
+	 * Current plugin version.
 	 *
-	 * @since    1.0.0
-	 * @access   protected
-	 * @var      string    $version    The current version of the plugin.
+	 * @var string
 	 */
 	protected $version;
 
 	/**
-	 * Define the core functionality of the plugin.
+	 * Optionally keep a reference to the OAuth helper.
 	 *
-	 * Set the plugin name and the plugin version that can be used throughout the plugin.
-	 * Load the dependencies, define the locale, and set the hooks for the admin area and
-	 * the public-facing side of the site.
+	 * @var Betait_Spfy_Playlist_OAuth|null
+	 */
+	protected $oauth = null;
+
+	/**
+	 * Constructor.
 	 *
-	 * @since    1.0.0
+	 * Sets the plugin slug, resolves version, loads dependencies,
+	 * configures i18n, and wires up admin/public hooks.
 	 */
 	public function __construct() {
-		if ( defined( 'BETAIT_SPFY_PLAYLIST_VERSION' ) ) {
-			$this->version = BETAIT_SPFY_PLAYLIST_VERSION;
-		} else {
-			$this->version = '1.0.0';
-		}
+		$this->version              = defined( 'BETAIT_SPFY_PLAYLIST_VERSION' ) ? BETAIT_SPFY_PLAYLIST_VERSION : '1.0.0';
 		$this->betait_spfy_playlist = 'betait-spfy-playlist';
 
 		$this->load_dependencies();
 		$this->set_locale();
 		$this->define_admin_hooks();
 		$this->define_public_hooks();
-
 	}
 
 	/**
-	 * Load the required dependencies for this plugin.
+	 * Load required dependencies.
 	 *
-	 * Include the following files that make up the plugin:
+	 * Files loaded:
+	 * - Loader (orchestrates add_action/add_filter calls)
+	 * - i18n (text domain loading)
+	 * - Admin/CPT/AJAX/OAuth/API handler
+	 * - Public
 	 *
-	 * - Betait_Spfy_Playlist_Loader. Orchestrates the hooks of the plugin.
-	 * - Betait_Spfy_Playlist_i18n. Defines internationalization functionality.
-	 * - Betait_Spfy_Playlist_Admin. Defines all hooks for the admin area.
-	 * - Betait_Spfy_Playlist_Public. Defines all hooks for the public side of the site.
-	 *
-	 * Create an instance of the loader which will be used to register the hooks
-	 * with WordPress.
-	 *
-	 * @since    1.0.0
-	 * @access   private
+	 * @return void
 	 */
 	private function load_dependencies() {
+		$base = plugin_dir_path( dirname( __FILE__ ) );
 
-		/**
-		 * The class responsible for orchestrating the actions and filters of the
-		 * core plugin.
-		 */
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-betait-spfy-playlist-loader.php';
+		// Loader & i18n.
+		require_once $base . 'includes/class-betait-spfy-playlist-loader.php';
+		require_once $base . 'includes/class-betait-spfy-playlist-i18n.php';
 
-		/**
-		 * The class responsible for defining internationalization functionality
-		 * of the plugin.
-		 */
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-betait-spfy-playlist-i18n.php';
+		// Core/feature classes.
+		require_once $base . 'admin/class-betait-spfy-playlist-admin.php';
+		require_once $base . 'admin/class-betait-spfy-playlist-api-handler.php';
+		require_once $base . 'admin/class-betait-spfy-playlist-cpt.php';
+		require_once $base . 'admin/class-betait-spfy-playlist-ajax.php';
+		require_once $base . 'includes/class-betait-spfy-playlist-oauth.php';
 
-		/**
-		 * The class responsible for defining all actions that occur in the admin area.
-		 */
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-betait-spfy-playlist-admin.php';
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-betait-spfy-playlist-api-handler.php';
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-betait-spfy-playlist-cpt.php';
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-betait-spfy-playlist-ajax.php';
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-betait-spfy-playlist-oauth.php';
-
-
-
-		/**
-		 * The class responsible for defining all actions that occur in the public-facing
-		 * side of the site.
-		 */
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'public/class-betait-spfy-playlist-public.php';
+		// Public frontend.
+		require_once $base . 'public/class-betait-spfy-playlist-public.php';
 
 		$this->loader = new Betait_Spfy_Playlist_Loader();
-
 	}
 
 	/**
-	 * Define the locale for this plugin for internationalization.
+	 * Configure internationalization.
 	 *
-	 * Uses the Betait_Spfy_Playlist_i18n class in order to set the domain and to register the hook
-	 * with WordPress.
-	 *
-	 * @since    1.0.0
-	 * @access   private
+	 * @return void
 	 */
 	private function set_locale() {
-
 		$plugin_i18n = new Betait_Spfy_Playlist_i18n();
-
 		$this->loader->add_action( 'plugins_loaded', $plugin_i18n, 'load_plugin_textdomain' );
-
 	}
- /**
-     * Register custom query vars and template redirects.
-     *
-     * @since 1.0.0
-     */
-    public function register_custom_hooks() {
 
-        // Add query var for handling the custom endpoint.
-        add_filter('query_vars', function ($vars) {
-            $vars[] = 'spotify_auth_redirect';
-            return $vars;
-        });
-
-        // Handle custom endpoint template rendering.
-        add_action('template_redirect', function () {
-            if (get_query_var('spotify_auth_redirect') == 1) {
-                include plugin_dir_path(__FILE__) . '../templates/spotify-auth-redirect.php';
-                exit;
-            }
-        });
-    }
 	/**
-	 * Register all of the hooks related to the admin area functionality
-	 * of the plugin.
+	 * Register hooks for admin area.
 	 *
-	 * @since    1.0.0
-	 * @access   private
+	 * - Enqueue admin styles/scripts
+	 * - Admin menu
+	 * - CPT & taxonomy
+	 * - Meta boxes and saving
+	 * - AJAX handlers
+	 * - OAuth bootstrap (REST lives elsewhere)
+	 *
+	 * @return void
 	 */
 	private function define_admin_hooks() {
-
 		$plugin_admin = new Betait_Spfy_Playlist_Admin( $this->get_betait_spfy_playlist(), $this->get_version() );
-		$plugin_cpt = new Betait_Spfy_Playlist_CPT();
-		$plugin_ajax = new Betait_Spfy_Playlist_Ajax();
-		//$plugin_oauth = new Betait_Spfy_OAuth();
-		$this->oauth = new Betait_Spfy_Playlist_OAuth();
+		$plugin_cpt   = new Betait_Spfy_Playlist_CPT();
+		$plugin_ajax  = new Betait_Spfy_Playlist_Ajax();
+		$this->oauth  = new Betait_Spfy_Playlist_OAuth();
 
-	
-		// Enqueue admin styles and scripts.
+		// Assets.
 		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_styles' );
 		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts' );
-	
-		// Add admin menu and page.
+		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_profile_inline_js' );
+
+		// Admin UI.
 		$this->loader->add_action( 'admin_menu', $plugin_admin, 'add_admin_menu' );
-	
-		// Register Custom Post Type and Taxonomy.
+
+		// CPT & taxonomy.
 		$this->loader->add_action( 'init', $plugin_cpt, 'register_cpt_and_taxonomy' );
-	
-		// Add metaboxes for Playlists.
+
+		// Meta boxes & save handlers.
 		$this->loader->add_action( 'add_meta_boxes', $plugin_cpt, 'add_meta_boxes' );
-	
-		// Save playlist meta data.
 		$this->loader->add_action( 'save_post', $plugin_cpt, 'save_playlist_meta' );
+
+		// Profile actions / disconnect notice.
+		$this->loader->add_action( 'show_user_profile', $plugin_admin, 'render_spotify_auth_profile_row' );
+		$this->loader->add_action( 'edit_user_profile', $plugin_admin, 'render_spotify_auth_profile_row' );
+		$this->loader->add_action( 'admin_post_bspfy_disconnect_spotify', $plugin_admin, 'handle_disconnect_spotify' );
+		$this->loader->add_action( 'admin_notices', $plugin_admin, 'maybe_render_disconnect_notice' );
+
+		// AJAX endpoints (admin-ajax.php).
+		$this->loader->add_action( 'wp_ajax_search_spotify_tracks', $plugin_ajax, 'search_spotify_tracks' );
+		$this->loader->add_action( 'wp_ajax_save_spotify_access_token', $plugin_ajax, 'save_spotify_access_token' );
+		$this->loader->add_action( 'wp_ajax_save_spotify_user_name', $plugin_ajax, 'save_spotify_user_name' );
 	}
-	
-	
 
 	/**
-	 * Register all of the hooks related to the public-facing functionality
-	 * of the plugin.
+	 * Register hooks for public-facing side.
 	 *
-	 * @since    1.0.0
-	 * @access   private
+	 * @return void
 	 */
 	private function define_public_hooks() {
-
 		$plugin_public = new Betait_Spfy_Playlist_Public( $this->get_betait_spfy_playlist(), $this->get_version() );
 
 		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_styles' );
 		$this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_scripts' );
 
+		// Optional: playlist single template override.
+		$this->loader->add_filter( 'template_include', $plugin_public, 'load_playlist_template' );
 	}
 
 	/**
-	 * Run the loader to execute all of the hooks with WordPress.
+	 * Execute all registered hooks with WordPress.
 	 *
-	 * @since    1.0.0
+	 * @return void
 	 */
 	public function run() {
 		$this->loader->run();
-		$this->register_custom_hooks();
+
+		// Legacy rewrite support has been removed in favor of REST routes.
+		// If you ever re-introduce a pretty endpoint, register rewrites on `init`
+		// here via the loader and keep flush in the Activator only.
 	}
 
 	/**
-	 * The name of the plugin used to uniquely identify it within the context of
-	 * WordPress and to define internationalization functionality.
+	 * Get the plugin slug.
 	 *
-	 * @since     1.0.0
-	 * @return    string    The name of the plugin.
+	 * @return string
 	 */
 	public function get_betait_spfy_playlist() {
 		return $this->betait_spfy_playlist;
 	}
 
 	/**
-	 * The reference to the class that orchestrates the hooks with the plugin.
+	 * Get the Loader instance.
 	 *
-	 * @since     1.0.0
-	 * @return    Betait_Spfy_Playlist_Loader    Orchestrates the hooks of the plugin.
+	 * @return Betait_Spfy_Playlist_Loader
 	 */
 	public function get_loader() {
 		return $this->loader;
 	}
 
 	/**
-	 * Retrieve the version number of the plugin.
+	 * Get current plugin version.
 	 *
-	 * @since     1.0.0
-	 * @return    string    The version number of the plugin.
+	 * @return string
 	 */
 	public function get_version() {
 		return $this->version;
 	}
-
 }
