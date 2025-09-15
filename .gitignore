@@ -21,6 +21,8 @@ Thumbs.db
 nbproject
 *.sublime-project
 *.sublime-workspace
+*.code-workspace
+.vscode
 
 # Dreamweaver added files
 _notes
