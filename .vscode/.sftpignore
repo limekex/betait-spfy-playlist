@@ -1,5 +1,6 @@
 # Ignorer .git-mappen
 .git/
+.vscode/
 
 
 # Ignorer node_modules-mappen
@@ -7,9 +8,11 @@ node_modules/
 
 # Ignorer alle loggfiler
 *.log
+*.code-workspace
 
 .gitignore
 CHANGELOG.md
 README.md
 .sftpignore
 sftp.json
+issues.json

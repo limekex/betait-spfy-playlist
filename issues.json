@@ -1,0 +1,82 @@
+[
+  {
+    "title": "Admin: Preloader overlay around auth/search (race-safe)",
+    "body": "Ref: sprint-1\n\nMake overlay show/hide around token fetch, OAuth popup, and search requests in admin JS, with try/finally and no leaking globals.\n\n### Tasks\n- [ ] Wrap search click handler with overlay show/hide\n- [ ] Wrap `ensureAccessToken({interactive:true})` and OAuth popup with overlay\n- [ ] Guard double-inits of SDK with a single-flight promise\n- [ ] Manual test: fail 401/429 paths and ensure overlay hides\n\n### Acceptance\n- Overlay never stays stuck after any failure path\n- No `ReferenceError` on overlay object in consoles",
+    "labels": ["area/admin","bug","priority/high","ui/ux"]
+  },
+  {
+    "title": "Admin/Public: UTF-8 rendering for track metadata (Ø/Å/Æ etc.)",
+    "body": "Ref: sprint-1\n\nEnsure end-to-end UTF-8: PHP json encoding, JS rendering, and WordPress meta read/write so names don't appear as `\\u00D8`.\n\n### Tasks\n- [ ] Use `wp_json_encode( $data, JSON_UNESCAPED_UNICODE )` where serializing\n- [ ] Avoid double-encoding; store arrays or single-encode JSON\n- [ ] In JS, render text nodes (no manual escaping that double-encodes)\n- [ ] Verify saved CPT and template output shows proper characters\n\n### Acceptance\n- Track/artist/album names render with native characters both in admin and public templates",
+    "labels": ["area/admin","area/public","bug","i18n"]
+  },
+  {
+    "title": "Admin: Search filter/limit parity with AJAX",
+    "body": "Ref: sprint-1\n\nKeep client and server in sync for `type` (track/artist/album) and `limit` (1–50) validation.\n\n### Tasks\n- [ ] Validate `limit` in JS (clamp 1–50) and pass to AJAX\n- [ ] Validate & clamp in PHP handler (server is source of truth)\n- [ ] Unit test server handler for edge values (0, 51, junk)\n\n### Acceptance\n- Server refuses out-of-range values; client UI reflects same bounds",
+    "labels": ["area/admin","enhancement"]
+  },
+  {
+    "title": "Admin: Enforce AJAX nonce for save_spotify_user_name",
+    "body": "Ref: sprint-1\n\nHarden `save_spotify_user_name` with nonce/cap checks.\n\n### Tasks\n- [ ] Add nonce to admin JS POST and verify on PHP side\n- [ ] Capability check: current user can edit post or profile as appropriate\n- [ ] Return 401/403 on failure with JSON error\n\n### Acceptance\n- Requests without valid nonce are rejected; WP debug log clean",
+    "labels": ["area/admin","security","bug"]
+  },
+  {
+    "title": "OAuth: Centralize scopes via constant and admin setting",
+    "body": "Ref: sprint-1\n\nIntroduce a single source of truth for Spotify scopes with optional UI toggle.\n\n### Tasks\n- [ ] Define `BSPFY_OAUTH_SCOPES` constant (filterable)\n- [ ] Wire scopes in `/oauth/start`\n- [ ] (Optional) Admin setting to choose standard/minimal scope set\n- [ ] Document scope rationale in README\n\n### Acceptance\n- Changing scopes at one place changes auth URL; health check shows scopes",
+    "labels": ["area/oauth","enhancement","security"]
+  },
+  {
+    "title": "OAuth: Add `/oauth/health` endpoint (diagnostics)",
+    "body": "Ref: sprint-1\n\nExpose a lightweight health endpoint that reports client_id presence, cookie flags, and can optionally probe a minimal Spotify call.\n\n### Tasks\n- [ ] Implement `GET /bspfy/v1/oauth/health`\n- [ ] Return status for: client creds present, cookie SameSite/secure, optional token/refresh availability (redacted)\n- [ ] Feature-flag external probe to Spotify (off by default)\n\n### Acceptance\n- Hitting endpoint returns JSON health without sensitive tokens",
+    "labels": ["area/oauth","enhancement","observability"]
+  },
+  {
+    "title": "OAuth: Cookie SameSite/Domain options",
+    "body": "Ref: sprint-1\n\nMake cookie policy configurable for subdomain/iframe setups.\n\n### Tasks\n- [ ] Settings toggles for SameSite (Lax/Strict/None) and domain override\n- [ ] Enforce Secure when SameSite=None\n- [ ] Document recommended settings for common setups\n\n### Acceptance\n- Cookies behave correctly across subdomains per selected policy",
+    "labels": ["area/oauth","enhancement","security"]
+  },
+  {
+    "title": "Templates: Theme override guide + filters",
+    "body": "Ref: sprint-1\n\nDocument and support overriding plugin templates from themes.\n\n### Tasks\n- [ ] Add `betait_spfy_playlist_locate_template` filter\n- [ ] README: where to place overrides under theme/child theme\n- [ ] Add inline docblocks in templates explaining override order\n\n### Acceptance\n- Dropping a header/main/footer/player template in theme overrides plugin template",
+    "labels": ["area/templates","documentation","enhancement"]
+  },
+  {
+    "title": "CPT: Harden save routine for `_playlist_tracks`",
+    "body": "Ref: sprint-1\n\nEnsure we store deduped, safe data and avoid double JSON encoding.\n\n### Tasks\n- [ ] Dedup by track `id` server-side (already added — add tests)\n- [ ] Store as canonical JSON with `JSON_UNESCAPED_UNICODE`\n- [ ] Unit test malformed input (non-array, bad JSON)\n\n### Acceptance\n- Meta always contains a clean, deduped representation",
+    "labels": ["area/cpt","enhancement","qa"]
+  },
+  {
+    "title": "Public: Mini device picker – tune polling/backoff",
+    "body": "Ref: sprint-1\n\nAdjust polling cadence and backoff for device/volume sync to reduce API load but keep UI fresh.\n\n### Tasks\n- [ ] Poll devices every 5–10s only when menu open/playing/remote\n- [ ] Jittered backoff for 429\n- [ ] Perf check: no layout thrash while updating list\n\n### Acceptance\n- No visible lag; rate-limit safe; minimal reflows",
+    "labels": ["area/public","enhancement","ui/ux"]
+  },
+  {
+    "title": "Public: Seekbar hover performance & a11y",
+    "body": "Ref: sprint-1\n\nImprove seek hover math to use `pageX`/cached widths and add ARIA/focus handling.\n\n### Tasks\n- [ ] Cache measurements; recalc on resize only\n- [ ] Add proper ARIA labels/roles for seek and buttons\n- [ ] Keyboard: left/right to nudge seek; space/enter to toggle play\n\n### Acceptance\n- Smooth hover on low-end devices; keyboard accessible",
+    "labels": ["area/public","enhancement","a11y"]
+  },
+  {
+    "title": "Public: Auto-advance to next DOM track",
+    "body": "Ref: sprint-1\n\nWhen a track ends, automatically play the next visible track in the template order.\n\n### Tasks\n- [ ] Detect end state from `player_state_changed`\n- [ ] Compute next URI from `.bspfy-play-icon[data-uri]` order\n- [ ] Wrap with single-flight so it doesn’t double-trigger\n\n### Acceptance\n- Always advances exactly one; loops at end",
+    "labels": ["area/public","enhancement"]
+  },
+  {
+    "title": "Build: Add PHPCS + WordPress coding standards",
+    "body": "Ref: sprint-1\n\nIntroduce PHPCS and WPCS rules in CI and pre-commit.\n\n### Tasks\n- [ ] Add `phpcs.xml` with WPCS\n- [ ] GitHub Action to run PHPCS\n- [ ] Fix or baseline existing warnings\n\n### Acceptance\n- CI fails on new sniff violations",
+    "labels": ["area/build","chore","tech-debt"]
+  },
+  {
+    "title": "QA: Basic E2E smoke tests (Cypress/Playwright)",
+    "body": "Ref: sprint-1\n\nAutomate a minimal happy path: auth popup, play a track, device list shows, overlay hides.\n\n### Tasks\n- [ ] Set up Cypress or Playwright\n- [ ] Mock Spotify endpoints where feasible\n- [ ] One smoke test on each major flow\n\n### Acceptance\n- Test runs green in CI on PRs",
+    "labels": ["area/tests","chore","qa"]
+  },
+  {
+    "title": "Release: Cut v2.1.0 (changelog + readme)",
+    "body": "Ref: sprint-1\n\nPrepare next release with notes on OAuth hardening and public player improvements.\n\n### Tasks\n- [ ] Update version constants/headers\n- [ ] Write CHANGELOG.md entries\n- [ ] Readme: template overrides & scopes section\n\n### Acceptance\n- Tag `v2.1.0` published; changelog accurate",
+    "labels": ["area/release","chore"]
+  },
+  {
+    "title": "Docs: Getting started + Security model",
+    "body": "Ref: sprint-1\n\nImprove onboarding and explain token/refresh storage, cookie flags, and scopes.\n\n### Tasks\n- [ ] Quick start (admin + public usage)\n- [ ] OAuth flow with diagrams\n- [ ] Security considerations and recommended settings\n\n### Acceptance\n- New user can install, auth, and play in <10 minutes",
+    "labels": ["area/docs","documentation"]
+  }
+]
