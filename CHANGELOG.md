@@ -9,6 +9,14 @@ This project follows **Semantic Versioning** and a simplified *Keep a Changelog*
 - Optional server‑side token refresh (cron) — under consideration.
 - Device/queue ownership policy — under consideration.
 
+## [2.5.0]
+### Added
+- Overlay preloader on loads towards Spotify API
+- Tools & Debug-tab in settings with “Normalize now” (nonce-protection) & oAuth Health status
+
+### Fix
+- Fix: Normalize legacy mojibake (Ã/â/Â/�) og wrongful u00xx artifacts in saved _playlist_tracks.
+
 ## [2.0.0] - 2025-09-13
 ### Added
 - OAuth 2.0 **PKCE** flow via `/wp-json/bspfy/v1/oauth/*`.

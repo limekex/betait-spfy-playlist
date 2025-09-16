@@ -368,6 +368,9 @@ document.addEventListener('DOMContentLoaded', function () {
   const trackFilter   = document.getElementById('search_filter_track');
   const albumFilter   = document.getElementById('search_filter_album');
   const limitInput    = document.getElementById('search_limit'); // optional, 1–50
+  const healthBtn = document.getElementById('bspfy-check-health');
+  const healthOut = document.getElementById('bspfy-health-output');
+  async function toJson(x){ try { return JSON.stringify(x, null, 2); } catch { return String(x); } }
 
   if (!searchButton || !searchInput || !searchResults) {
     logDebug('Missing elements on the page. Ensure IDs are correct.', {
@@ -697,30 +700,30 @@ document.addEventListener('DOMContentLoaded', function () {
     `;
   }
 
-// updateAuthStatus
-async function updateAuthStatus() {
-  const ov = window.bspfyOverlay; ov && ov.show({ title: 'Checking Spotify status…', reason: 'auth-status' });
-  try {
-    const data = await window.bspfyAuth.fetchJSON(
-      `${(window.bspfyDebug?.rest_root || (window.location.origin + '/wp-json')).replace(/\/$/, '')}/bspfy/v1/oauth/token`
-    );
-    if (data.authenticated && data.access_token) {
-      const meRes = await fetch('https://api.spotify.com/v1/me', {
-        headers: { Authorization: `Bearer ${data.access_token}` }
-      });
-      const me = meRes.ok ? await meRes.json() : null;
-      const name = me?.display_name || 'Authenticated';
-      showAuthenticatedStatus(name);
-      saveSpotifyUserName(name);
-    } else {
+  // updateAuthStatus
+  async function updateAuthStatus() {
+    const ov = window.bspfyOverlay; ov && ov.show({ title: 'Checking Spotify status…', reason: 'auth-status' });
+    try {
+      const data = await window.bspfyAuth.fetchJSON(
+        `${(window.bspfyDebug?.rest_root || (window.location.origin + '/wp-json')).replace(/\/$/, '')}/bspfy/v1/oauth/token`
+      );
+      if (data.authenticated && data.access_token) {
+        const meRes = await fetch('https://api.spotify.com/v1/me', {
+          headers: { Authorization: `Bearer ${data.access_token}` }
+        });
+        const me = meRes.ok ? await meRes.json() : null;
+        const name = me?.display_name || 'Authenticated';
+        showAuthenticatedStatus(name);
+        saveSpotifyUserName(name);
+      } else {
+        showAuthButton();
+      }
+    } catch (e) {
       showAuthButton();
+    } finally {
+      ov && ov.hide();
     }
-  } catch (e) {
-    showAuthButton();
-  } finally {
-    ov && ov.hide();
   }
-}
 
   function saveSpotifyUserName(spotifyName) {
     fetch(ajaxUrl, {
@@ -741,6 +744,25 @@ async function updateAuthStatus() {
 
   // Init auth status on load (non-interactive)
   updateAuthStatus();
+
+  
+  if (healthBtn && healthOut) {
+    healthBtn.addEventListener('click', async () => {
+      const ov = window.bspfyOverlay; ov && ov.show({ title: 'Checking OAuth health…', reason: 'health' });
+      healthOut.textContent = '';
+      try {
+        const root = (window.bspfyDebug?.rest_root || (window.location.origin + '/wp-json')).replace(/\/$/, '');
+        const res  = await fetch(`${root}/bspfy/v1/oauth/health?dbg=1`, { credentials:'include', cache:'no-store' });
+        const json = await res.json().catch(() => ({}));
+        healthOut.textContent = await toJson(json);
+      } catch (e) {
+        healthOut.textContent = 'Error contacting health endpoint.';
+      } finally {
+        ov && ov.hide();
+      }
+    });
+  }
+
 });
 
 

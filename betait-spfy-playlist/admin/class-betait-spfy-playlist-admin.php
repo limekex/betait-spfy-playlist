@@ -61,6 +61,11 @@ class Betait_Spfy_Playlist_Admin {
 		// Disconnect POST handler + notice.
 		add_action( 'admin_post_bspfy_disconnect_spotify', array( $this, 'handle_disconnect_spotify' ) );
 		add_action( 'admin_notices', array( $this, 'maybe_render_disconnect_notice' ) );
+
+		// Debugging and status.
+		add_action( 'admin_init', [ $this, 'register_tools_settings' ] );
+		add_action( 'admin_init', [ $this, 'maybe_run_unicode_normalizer' ] );
+		add_action( 'admin_notices', [ $this, 'maybe_show_unicode_notice' ] );
 	}
 
 	/**
@@ -248,6 +253,9 @@ class Betait_Spfy_Playlist_Admin {
 			update_option( 'bspfy_require_premium', isset( $_POST['bspfy_require_premium'] ) ? 1 : 0 );
 			update_option( 'bspfy_strict_samesite', isset( $_POST['bspfy_strict_samesite'] ) ? 1 : 0 );
 
+			// Tools & Debug
+			update_option('bspfy_enable_unicode_tools',isset($_POST['bspfy_enable_unicode_tools']) ? 1 : 0);
+
 			echo '<div class="updated notice is-dismissible"><p>' . esc_html__( 'Settings saved!', 'betait-spfy-playlist' ) . '</p></div>';
 		}
 
@@ -287,6 +295,7 @@ class Betait_Spfy_Playlist_Admin {
 		echo '<div class="bspfy-tabs">';
 		echo '  <button type="button" class="bspfy-tab is-active" data-tab="general">' . esc_html__( 'General settings', 'betait-spfy-playlist' ) . '</button>';
 		echo '  <button type="button" class="bspfy-tab" data-tab="api">' . esc_html__( 'Spotify API', 'betait-spfy-playlist' ) . '</button>';
+		echo '  <button type="button" class="bspfy-tab" data-tab="tools">' . esc_html__( 'Tools & Debug', 'betait-spfy-playlist' ) . '</button>';
 		echo '</div>';
 
 		echo '<form method="post" action="">';
@@ -340,7 +349,7 @@ class Betait_Spfy_Playlist_Admin {
 		echo '  <td>';
 		echo '    <select id="bspfy_playlist_theme" name="bspfy_playlist_theme">';
 		foreach ( $playlist_themes as $key => $label ) {
-			echo '<option value="' . esc_attr( $key ) . '"' . selected( $ $playlist_theme, $key, false ) . '>' . esc_html( $label ) . '</option>';
+			echo '<option value="' . esc_attr( $key ) . '"' . selected( $playlist_theme, $key, false ) . '>' . esc_html( $label ) . '</option>';
 		}
 		echo '    </select>';
 		echo '    <p class="description">' . esc_html__( 'Choose a playlist layout (card or Spotify-like list).', 'betait-spfy-playlist' ) . '</p>';
@@ -398,6 +407,50 @@ class Betait_Spfy_Playlist_Admin {
 		echo '</ol>';
 
 		echo '</div>'; // /tabpanel api
+		
+		/* ----- TAB: TOOLS & DEBUG ----- */
+		echo '<div class="bspfy-tabpanel" id="bspfy-tab-tools" role="region" aria-label="' . esc_attr__( 'Tools & Debug', 'betait-spfy-playlist' ) . '">';
+
+		echo '<h2 class="bspfy-h2">' . esc_html__( 'Tools & Debug', 'betait-spfy-playlist' ) . '</h2>';
+
+		echo '<table class="form-table"><tbody>';
+		// Toggle for å aktivere migrering (engangskjøring via signert URL).
+		echo '<tr>';
+		echo '  <th scope="row"><label for="bspfy_enable_unicode_tools">' . esc_html__( 'Enable Unicode normalizer', 'betait-spfy-playlist' ) . '</label></th>';
+		echo '  <td>';
+		echo '    <label>';
+		echo '      <input type="checkbox" id="bspfy_enable_unicode_tools" name="bspfy_enable_unicode_tools" value="1" ' . checked( 1, (int) get_option( 'bspfy_enable_unicode_tools', 0 ), false ) . ' />';
+		echo '      ' . esc_html__( 'Allow running a one-time migration that normalizes legacy _playlist_tracks to proper UTF-8.', 'betait-spfy-playlist' );
+		echo '    </label>';
+		echo '    <p class="description">' . esc_html__( 'Take a database backup first. The migration is idempotent and can be re-run if needed.', 'betait-spfy-playlist' ) . '</p>';
+		echo '  </td>';
+		echo '</tr>';
+
+		// Kjør-lenke (vises kun når togglen er på)
+		if ( get_option( 'bspfy_enable_unicode_tools', 0 ) ) {
+			$run_url = wp_nonce_url(
+				add_query_arg( 'bspfy_fix_unicode_run', '1', menu_page_url( 'betait-spfy-playlist-settings', false ) ),
+				'bspfy_fix_unicode'
+			);
+			echo '<tr>';
+			echo '  <th scope="row">' . esc_html__( 'Run migration', 'betait-spfy-playlist' ) . '</th>';
+			echo '  <td>';
+			echo '    <a href="' . esc_url( $run_url ) . '" class="button button-primary">' . esc_html__( 'Normalize now', 'betait-spfy-playlist' ) . '</a>';
+			echo '    <p class="description">' . esc_html__( 'Scans all “playlist” posts and rewrites _playlist_tracks JSON as UTF-8.', 'betait-spfy-playlist' ) . '</p>';
+			echo '  </td>';
+			echo '</tr>';
+		}
+		echo '</tbody></table>';
+
+		echo '<hr />';
+
+		// OAuth Health
+		echo '<h3>' . esc_html__( 'OAuth Health', 'betait-spfy-playlist' ) . '</h3>';
+		echo '<p class="description">' . esc_html__( 'Checks the OAuth controller to help diagnose auth/token issues.', 'betait-spfy-playlist' ) . '</p>';
+		echo '<p><button type="button" class="button" id="bspfy-check-health">' . esc_html__( 'Check now', 'betait-spfy-playlist' ) . '</button></p>';
+		echo '<pre id="bspfy-health-output" style="background:#f6f7f7;border:1px solid #ccd0d4;border-radius:4px;padding:12px;max-height:320px;overflow:auto;"></pre>';
+
+		echo '</div>'; // /tabpanel tools
 
 		echo '<p><button type="submit" name="bspfy_save_settings" class="button button-primary">' . esc_html__( 'Save Settings', 'betait-spfy-playlist' ) . '</button></p>';
 		echo '</form>';
@@ -719,4 +772,170 @@ JS;
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Spotify connection has been disconnected for this user.', 'betait-spfy-playlist' ) . '</p></div>';
 		}
 	}
+
+	/**
+ * Register Tools & Debug settings.
+ * - bspfy_enable_unicode_tools: toggler at migreringslenke kan vises/kjøres
+ */
+public function register_tools_settings() : void {
+	register_setting(
+		'bspfy_settings',
+		'bspfy_enable_unicode_tools',
+		[
+			'type'              => 'boolean',
+			'sanitize_callback' => static function( $v ) { return (int) !! $v; },
+			'default'           => 0,
+		]
+	);
+}
+
+/**
+ * GET-runner for engangsmigrering: normaliserer eksisterende _playlist_tracks til ren UTF-8.
+ * Kalles via signert URL fra Tools & Debug-panelet.
+ */
+public function maybe_run_unicode_normalizer() : void {
+	if ( ! current_user_can( 'manage_options' ) ) return;
+	if ( empty( $_GET['bspfy_fix_unicode_run'] ) ) return; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+	// Krev at togglen er på for å kunne kjøre.
+	if ( ! get_option( 'bspfy_enable_unicode_tools', 0 ) ) {
+		wp_die( esc_html__( 'Unicode tool is disabled. Enable it in Tools & Debug first.', 'betait-spfy-playlist' ), 403 );
+	}
+
+	check_admin_referer( 'bspfy_fix_unicode' );
+
+	$ids = get_posts( [
+		'post_type'      => 'playlist',
+		'post_status'    => 'any',
+		'fields'         => 'ids',
+		'posts_per_page' => -1,
+		'no_found_rows'  => true,
+	] );
+
+	$updated = 0; $skipped = 0;
+
+	foreach ( $ids as $post_id ) {
+		$raw = get_post_meta( $post_id, '_playlist_tracks', true );
+		if ( ! $raw ) { $skipped++; continue; }
+
+		$arr = is_array( $raw ) ? $raw : json_decode( $raw, true );
+		if ( ! is_array( $arr ) ) { $skipped++; continue; }
+
+		$arr = $this->fix_mojibake_recursive( $arr );
+
+		update_post_meta($post_id, '_playlist_tracks', wp_json_encode( $arr, JSON_UNESCAPED_UNICODE ));
+		clean_post_cache($post_id);
+		wp_cache_delete($post_id, 'post_meta');
+		$updated++;
+	}
+
+	set_transient( 'bspfy_unicode_fix_notice', [
+		'updated' => $updated,
+		'skipped' => $skipped,
+		'ts'      => time(),
+	], 60 );
+
+	// Tilbake til settings-siden uten query args.
+	wp_safe_redirect( remove_query_arg( [ 'bspfy_fix_unicode_run', '_wpnonce' ] ) );
+	exit;
+}
+
+/**
+ * Enkel heuristikk for å reparere typisk mojibake i strings (Ã…/Ã˜/Ã†, â€¦ etc.)
+ */
+private function fix_mojibake_recursive( $value ) {
+    if ( is_array( $value ) ) {
+        foreach ( $value as $k => $v ) {
+            $value[ $k ] = $this->fix_mojibake_recursive( $v );
+        }
+        return $value;
+    }
+    if ( ! is_string( $value ) || $value === '' ) return $value;
+
+    $orig = $value;
+
+    // 0) Fiks "u00xx" som mangler backslash (f.eks. "Tu00ed" -> "Tí")
+    if ( stripos($value, 'u00') !== false ) {
+        $candidate = preg_replace_callback('/(?<!\\\\)[uU]00([0-9A-Fa-f]{2})/', function($m){
+            // trygt: la JSON gjøre dekodingen riktig
+            $json = '"\\u00' . strtolower($m[1]) . '"';
+            $chr  = json_decode($json);
+            return is_string($chr) ? $chr : $m[0];
+        }, $value);
+        if ( $this->looks_fixed($orig, $candidate) ) {
+            $value = $candidate;
+            $orig  = $value; // fortsett med videre heuristikk på “bedre” base
+        }
+    }
+
+    // Rask exit: ingen typiske mojibake-markører igjen
+    if (
+        strpos($value, 'Ã') === false &&
+        strpos($value, 'â') === false &&
+        strpos($value, 'Â') === false &&
+        strpos($value, '�') === false
+    ) {
+        return $value;
+    }
+
+    // A) utf8_encode/utf8_decode – ofte riktig for "Ã¸/Ã…/Ã†"
+    $a = @utf8_encode( @utf8_decode( $value ) );
+    if ( $this->looks_fixed( $orig, $a ) ) return $a;
+
+    // B) Windows-1252 -> UTF-8
+    if ( function_exists( 'mb_convert_encoding' ) ) {
+        $b = @mb_convert_encoding( $value, 'UTF-8', 'Windows-1252' );
+        if ( $this->looks_fixed( $orig, $b ) ) return $b;
+    }
+
+    // C) iconv fallback
+    if ( function_exists( 'iconv' ) ) {
+        $c = @iconv( 'Windows-1252', 'UTF-8//IGNORE', $value );
+        if ( $this->looks_fixed( $orig, $c ) ) return $c;
+    }
+
+    // D) Målrettet erstatning (skand. + typografiske)
+    $map = array(
+        'Ã…'=>'Å','Ã†'=>'Æ','Ã˜'=>'Ø','Ã¥'=>'å','Ã¦'=>'æ','Ã¸'=>'ø',
+        'Ã‰'=>'É','Ã©'=>'é','Ã¨'=>'è','Ã«'=>'ë','Ã¼'=>'ü','Ã¤'=>'ä','Ã¶'=>'ö',
+        'Ã¡'=>'á','Ã '=>'à','Ã­'=>'í','Ã³'=>'ó','Ãº'=>'ú','Ã±'=>'ñ','Ãº'=>'ú','Ã¢'=>'â',
+        'â€“'=>'–','â€”'=>'—','â€˜'=>'‘','â€™'=>'’','â€œ'=>'“','â€'=>'”','â€¦'=>'…',
+        'Â '=>' ','Â·'=>'·','Â©'=>'©'
+    );
+    $d = strtr( $value, $map );
+    if ( $this->looks_fixed( $orig, $d ) ) return $d;
+
+    return $value;
+}
+
+private function looks_fixed( $before, $after ) {
+    if ( ! is_string( $after ) || $after === '' ) return false;
+    $bad = array('Ã','â','Â','�','u00'); // ← ta med "u00"
+    $score = function( $s ) use ( $bad ) { $c = 0; foreach ( $bad as $b ) { $c += substr_count( $s, $b ); } return $c; };
+    return $score( $after ) < $score( $before );
+}
+
+
+/**
+ * Viser admin notice etter migrering.
+ */
+public function maybe_show_unicode_notice() : void {
+	if ( ! current_user_can( 'manage_options' ) ) return;
+	$data = get_transient( 'bspfy_unicode_fix_notice' );
+	if ( ! $data ) return;
+
+	delete_transient( 'bspfy_unicode_fix_notice' );
+
+	$updated = (int) ( $data['updated'] ?? 0 );
+	$skipped = (int) ( $data['skipped'] ?? 0 );
+
+	echo '<div class="notice notice-success is-dismissible"><p>';
+	printf(
+		esc_html__( 'Unicode normalization completed. Updated: %d, Skipped: %d.', 'betait-spfy-playlist' ),
+		$updated,
+		$skipped
+	);
+	echo '</p></div>';
+}
+
 }

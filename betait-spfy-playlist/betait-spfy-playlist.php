@@ -153,6 +153,15 @@ if ( ! betait_spfy_requirements_met() ) {
 	return;
 }
 
+ // Always keep Unicode characters unescaped in JSON produced by WordPress.
+ add_filter( 'wp_json_encode_options', function( $options ) {
+     if ( ! defined( 'JSON_UNESCAPED_UNICODE' ) ) {
+         return $options; // very old PHP fallback
+     }
+     return $options | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+}, 99 );
+
+
 /**
  * Bootstrap the core plugin class.
  * The main class wires up i18n, admin hooks, and public hooks via its loader.
