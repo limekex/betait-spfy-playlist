@@ -1,3 +1,4 @@
 # IDE/Editor
 .vscode/
 *.code-workspace
+.DS_Store/
