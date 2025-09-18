@@ -191,6 +191,10 @@
     }
   }
 
+  window.addEventListener('pagehide', () => window.bspfyOverlay?.hide());
+  window.addEventListener('unhandledrejection', () => window.bspfyOverlay?.hide());
+
+
   // Public API
   const api = { show, hide, fail, wrap };
 

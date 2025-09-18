@@ -68,6 +68,42 @@ class Betait_Spfy_Playlist_Admin {
 		add_action( 'admin_notices', [ $this, 'maybe_show_unicode_notice' ] );
 	}
 
+	/** Return true if we are on a plugin back-end page. */
+		private function is_bspfy_admin_screen() : bool {
+			$screen = function_exists('get_current_screen') ? get_current_screen() : null;
+			if ( ! $screen ) return false;
+
+			// Main page + Settings (vår meny)
+			if ( in_array( $screen->id, [
+				'toplevel_page_betait-spfy-playlist',
+				'betait-spfy-playlist_page_betait-spfy-playlist-settings',
+			], true ) ) {
+				return true;
+			}
+
+			// CPT screens for playlist (post.php, post-new.php)
+			if ( 'playlist' === ( $screen->post_type ?? '' ) ) {
+				return true;
+			}
+
+			// Genre-taxonomy below  playlist
+			if ( 'edit-tags' === $screen->base
+				&& isset($_GET['taxonomy'], $_GET['post_type'])
+				&& $_GET['taxonomy'] === 'genre'
+				&& $_GET['post_type'] === 'playlist' ) {
+				return true;
+			}
+
+			// User-profile / edit-user (OAuth-test/reconnect)
+			if ( in_array( $screen->id, [ 'profile', 'user-edit' ], true ) ) {
+				return true;
+			}
+
+			return false;
+		}
+
+
+
 	/**
 	 * Enqueue admin styles.
 	 *
@@ -84,12 +120,16 @@ class Betait_Spfy_Playlist_Admin {
 			'all'
 		);
 	
-		wp_enqueue_style(
-        'bspfy-overlay',
-        plugins_url('assets/css/bspfy-overlay.css', BETAIT_SPFY_PLAYLIST_FILE),
-        [],
-        $ver
-    );
+		// CSS – overlay: only on relevant pages
+		if ( $this->is_bspfy_admin_screen() ) {
+			wp_enqueue_style(
+				'bspfy-overlay',
+				plugins_url( 'assets/css/bspfy-overlay.css', BETAIT_SPFY_PLAYLIST_FILE ),
+				[],
+				$ver
+			);
+		}
+	
 
 		// Avoid double-loading Font Awesome if a theme/admin already enqueues it.
 		if ( ! wp_style_is( 'font-awesome', 'enqueued' ) ) {
@@ -120,13 +160,18 @@ class Betait_Spfy_Playlist_Admin {
 			true
 		);
 
-		 wp_enqueue_script(
-        'bspfy-overlay',
-        plugins_url('assets/js/bspfy-overlay.js', BETAIT_SPFY_PLAYLIST_FILE),
-        [],
-        $ver,
-        true
-    );
+			// JS – overlay: only on relevant pages + container in footer
+			if ( $this->is_bspfy_admin_screen() ) {
+				wp_enqueue_script(
+					'bspfy-overlay',
+					plugins_url( 'assets/js/bspfy-overlay.js', BETAIT_SPFY_PLAYLIST_FILE ),
+					[],
+					$ver,
+					true
+				);
+				add_action( 'admin_footer', [ $this, 'print_overlay_container' ] );
+			}
+
 
 		// Safe data for admin JS (never expose client secret here).
 		wp_localize_script(
@@ -558,181 +603,196 @@ class Betait_Spfy_Playlist_Admin {
 		$admin_post_url = esc_url_raw( admin_url( 'admin-post.php' ) );
 
 		$inline = <<<JS
-document.addEventListener('DOMContentLoaded', function(){
-(function(){
-    // REST helpers from localized data.
-    var REST_ROOT  = ((window.bspfyDebug && bspfyDebug.rest_root)  || (window.location.origin + '/wp-json')).replace(/\\/\$/, '');
-    var REST_NONCE =  (window.bspfyDebug && bspfyDebug.rest_nonce) || '';
-    var ADMIN_POST = '{$admin_post_url}'; // admin-post endpoint for disconnect
+		document.addEventListener('DOMContentLoaded', function(){
+		(function(){
+			// REST helpers from localized data.
+			var REST_ROOT  = ((window.bspfyDebug && bspfyDebug.rest_root)  || (window.location.origin + '/wp-json')).replace(/\/$/, '');
+			var REST_NONCE =  (window.bspfyDebug && bspfyDebug.rest_nonce) || '';
+			var __ov = (typeof window.bspfyOverlay === 'object' && window.bspfyOverlay) ? window.bspfyOverlay : {};
+			var __overlay = {
+				show: (typeof __ov.show === 'function') ? __ov.show.bind(__ov) : function(){},
+				hide: (typeof __ov.hide === 'function') ? __ov.hide.bind(__ov) : function(){},
+				with: (typeof __ov.with === 'function')
+					? __ov.with.bind(__ov)
+					: async function(task){
+						this.show();
+						try { return await (typeof task === 'function' ? task() : task); }
+						finally { this.hide(); }
+					}
+				};
+			var ADMIN_POST = '{$admin_post_url}'; // admin-post endpoint for disconnect
 
-    var base = REST_ROOT + '/bspfy/v1/oauth';
+			var base = REST_ROOT + '/bspfy/v1/oauth';
 
-    function \$(s){ return document.querySelector(s); }
+			function $(s){ return document.querySelector(s); }
 
-    function withNonceUrl(u){
-        try {
-            var url = new URL(u, window.location.origin);
-            if (REST_NONCE) url.searchParams.set('_wpnonce', REST_NONCE);
-            return url.toString();
-        } catch(e){
-            return u + (u.indexOf('?')>-1 ? '&' : '?') + '_wpnonce=' + encodeURIComponent(REST_NONCE || '');
-        }
-    }
+			function withNonceUrl(u){
+				try {
+					var url = new URL(u, window.location.origin);
+					if (REST_NONCE) url.searchParams.set('_wpnonce', REST_NONCE);
+					return url.toString();
+				} catch(e){
+					return u + (u.indexOf('?')>-1 ? '&' : '?') + '_wpnonce=' + encodeURIComponent(REST_NONCE || '');
+				}
+			}
 
-    function fetchJSON(u, opts){
-        var headersIn = (opts && opts.headers) ? opts.headers : {};
-        var finalHdrs = Object.assign({}, headersIn, (REST_NONCE ? {'X-WP-Nonce': REST_NONCE} : {}));
-        var finalOpts = Object.assign({ credentials:'include', cache:'no-store', headers: finalHdrs }, (opts||{}));
-        return fetch(withNonceUrl(u), finalOpts).then(function(r){
-            return r.json().then(function(j){
-                if(!r.ok){ var e=new Error('HTTP ' + r.status); e.status=r.status; e.body=j; throw e; }
-                return j;
-            });
-        });
-    }
+			function fetchJSON(u, opts){
+				var headersIn = (opts && opts.headers) ? opts.headers : {};
+				var finalHdrs = Object.assign({}, headersIn, (REST_NONCE ? {'X-WP-Nonce': REST_NONCE} : {}));
+				var finalOpts = Object.assign({ credentials:'include', cache:'no-store', headers: finalHdrs }, (opts||{}));
+				return fetch(withNonceUrl(u), finalOpts).then(function(r){
+					return r.json().then(function(j){
+						if(!r.ok){ var e=new Error('HTTP ' + r.status); e.status=r.status; e.body=j; throw e; }
+						return j;
+					});
+				});
+			}
 
-    var root = document.getElementById('bspfy-profile-root'); if (!root) return;
-    var userId = parseInt(root.dataset.userId||'0',10) || 0;
-    var nonce  = root.dataset.disconnectNonce || '';
+			var root = document.getElementById('bspfy-profile-root'); if (!root) return;
+			var userId = parseInt(root.dataset.userId||'0',10) || 0;
+			var nonce  = root.dataset.disconnectNonce || '';
 
-    function getContainers(){
-        var table = root.nextElementSibling;
-        if (!table || table.tagName.toLowerCase() !== 'table') {
-            table = document.querySelector('#bspfy-profile-root + table.form-table, #bspfy-profile-root + table');
-        }
-        if (!table) return {};
-        var td = table.querySelector('tr > td');
-        if (!td) return { table: table };
-        var submit = td.querySelector('.submit');
-        if (!submit) {
-            submit = document.createElement('p');
-            submit.className = 'submit';
-            submit.style.marginTop = '8px';
-            td.appendChild(submit);
-        }
-        return { table: table, td: td, submit: submit };
-    }
+			function getContainers(){
+				var table = root.nextElementSibling;
+				if (!table || table.tagName.toLowerCase() !== 'table') {
+					table = document.querySelector('#bspfy-profile-root + table.form-table, #bspfy-profile-root + table');
+				}
+				if (!table) return {};
+				var td = table.querySelector('tr > td');
+				if (!td) return { table: table };
+				var submit = td.querySelector('.submit');
+				if (!submit) {
+					submit = document.createElement('p');
+					submit.className = 'submit';
+					submit.style.marginTop = '8px';
+					td.appendChild(submit);
+				}
+				return { table: table, td: td, submit: submit };
+			}
 
-    function ensureButton(id, html){
-        var existing = document.getElementById(id);
-        if (existing) return existing;
-        var c = getContainers();
-        if (!c.submit) return null;
-        var temp = document.createElement('span'); temp.innerHTML = html.trim();
-        var node = temp.firstElementChild; if (!node) return null;
-        c.submit.appendChild(node);
-        return node;
-    }
+			function ensureButton(id, html){
+				var existing = document.getElementById(id);
+				if (existing) return existing;
+				var c = getContainers();
+				if (!c.submit) return null;
+				var temp = document.createElement('span'); temp.innerHTML = html.trim();
+				var node = temp.firstElementChild; if (!node) return null;
+				c.submit.appendChild(node);
+				return node;
+			}
 
-    function setStatus(text){
-        var c = getContainers();
-        if (!c.td) return;
-        var strong = c.td.querySelector('strong');
-        if (strong) strong.textContent = text;
-    }
+			function setStatus(text){
+				var c = getContainers();
+				if (!c.td) return;
+				var strong = c.td.querySelector('strong');
+				if (strong) strong.textContent = text;
+			}
 
-    function toConnectedUI(){
-        setStatus('Connected');
-        var btnConn = document.getElementById('bspfy-auth-connect');
-        if (btnConn) btnConn.style.display = 'none';
-        var btnRe  = ensureButton('bspfy-auth-reconnect','<button type="button" class="button" id="bspfy-auth-reconnect">Reconnect</button>');
-        var btnDis = ensureButton('bspfy-auth-disconnect','<button type="button" class="button button-link-delete" id="bspfy-auth-disconnect">Disconnect</button>');
-        if (btnRe)  btnRe.onclick  = connectOrReconnect;
-        if (btnDis) btnDis.onclick = doDisconnect;
-    }
+			function toConnectedUI(){
+				setStatus('Connected');
+				var btnConn = document.getElementById('bspfy-auth-connect');
+				if (btnConn) btnConn.style.display = 'none';
+				var btnRe  = ensureButton('bspfy-auth-reconnect','<button type="button" class="button" id="bspfy-auth-reconnect">Reconnect</button>');
+				var btnDis = ensureButton('bspfy-auth-disconnect','<button type="button" class="button button-link-delete" id="bspfy-auth-disconnect">Disconnect</button>');
+				if (btnRe)  btnRe.onclick  = connectOrReconnect;
+				if (btnDis) btnDis.onclick = doDisconnect;
+			}
 
-    function openPopupAuth(){
-        return fetchJSON(base + '/start', {
-            method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ redirectBack: window.location.href })
-        }).then(function(d){
-            var w=520,h=680,l=window.screenX+(window.outerWidth-w)/2,t=window.screenY+(window.outerHeight-h)/2;
-            var pop=window.open(d.authorizeUrl,'bspfy-auth','width='+w+',height='+h+',left='+l+',top='+t);
-            if(!pop) throw new Error('POPUP_BLOCKED');
-            return new Promise(function(resolve,reject){
-                var iv=setInterval(function(){ try{ if(!pop || pop.closed){ clearInterval(iv); reject(new Error('popup-closed')); } }catch(_){ } }, 800);
-                function onMsg(ev){
-                    if(ev.origin!==window.location.origin) return;
-                    if(ev.data && ev.data.type==='bspfy-auth' && ev.data.success){
-                        window.removeEventListener('message',onMsg);
-                        clearInterval(iv); try{ pop.close(); }catch(e){}
-                        resolve(true);
-                    }
-                }
-                window.addEventListener('message', onMsg);
-            });
-        });
-    }
+			function openPopupAuth(){
+				return fetchJSON(base + '/start', {
+					method:'POST', headers:{'Content-Type':'application/json'},
+					body: JSON.stringify({ redirectBack: window.location.href })
+				}).then(function(d){
+					var w=520,h=680,l=window.screenX+(window.outerWidth-w)/2,t=window.screenY+(window.outerHeight-h)/2;
+					var pop=window.open(d.authorizeUrl,'bspfy-auth','width='+w+',height='+h+',left='+l+',top='+t);
+					if(!pop) throw new Error('POPUP_BLOCKED');
+					return new Promise(function(resolve,reject){
+						var iv=setInterval(function(){ try{ if(!pop || pop.closed){ clearInterval(iv); reject(new Error('popup-closed')); } }catch(_){ } }, 800);
+						function onMsg(ev){
+							if(ev.origin!==window.location.origin) return;
+							if(ev.data && ev.data.type==='bspfy-auth' && ev.data.success){
+								window.removeEventListener('message',onMsg);
+								clearInterval(iv); try{ pop.close(); }catch(e){}
+								resolve(true);
+							}
+						}
+						window.addEventListener('message', onMsg);
+					});
+				});
+			}
 
-    function pollForToken(timeoutMs){
-        var deadline = Date.now() + (timeoutMs||5000);
-        return new Promise(function(resolve,reject){
-            (function tick(){
-                fetchJSON(base + '/token').then(function(r){
-                    if (r && r.access_token) return resolve(r);
-                    if (Date.now() > deadline) return reject(new Error('token-timeout'));
-                    setTimeout(tick, 350);
-                }).catch(function(_){
-                    if (Date.now() > deadline) return reject(new Error('token-timeout'));
-                    setTimeout(tick, 350);
-                });
-            })();
-        });
-    }
+			function pollForToken(timeoutMs){
+				var deadline = Date.now() + (timeoutMs||5000);
+				return new Promise(function(resolve,reject){
+					(function tick(){
+						fetchJSON(base + '/token').then(function(r){
+							if (r && r.access_token) return resolve(r);
+							if (Date.now() > deadline) return reject(new Error('token-timeout'));
+							setTimeout(tick, 350);
+						}).catch(function(_){
+							if (Date.now() > deadline) return reject(new Error('token-timeout'));
+							setTimeout(tick, 350);
+						});
+					})();
+				});
+			}
 
-    function connectOrReconnect(){
-        openPopupAuth()
-            .then(function(){ return pollForToken(5000); })
-            .then(function(){ toConnectedUI(); })
-            .catch(function(e){ alert('Could not authenticate: ' + (e && e.message ? e.message : 'unknown error')); });
-    }
+			function connectOrReconnect(){
+				__overlay.with(async function(){
+					await openPopupAuth();
+					await pollForToken(5000);
+				})
+				.then(function(){ toConnectedUI(); })
+				.catch(function(e){
+					alert('Could not authenticate: ' + (e && e.message ? e.message : 'unknown error'));
+				});
+			} // <— MANGLET
 
-    function doDisconnect(){
-        fetchJSON(base + '/logout', { method:'POST' })
-            .finally(function(){
-                var form = document.createElement('form'); form.method='POST'; form.action=ADMIN_POST;
-                form.innerHTML =
-                    '<input type="hidden" name="action" value="bspfy_disconnect_spotify" />' +
-                    '<input type="hidden" name="user_id" value="'+ String(userId) +'" />' +
-                    '<input type="hidden" name="bspfy_disconnect_nonce" value="'+ String(nonce) +'" />';
-                document.body.appendChild(form); form.submit();
-            });
-    }
+			function doDisconnect(){
+				fetchJSON(base + '/logout', { method:'POST' })
+					.finally(function(){
+						var form = document.createElement('form'); form.method='POST'; form.action=ADMIN_POST;
+						form.innerHTML =
+							'<input type="hidden" name="action" value="bspfy_disconnect_spotify" />' +
+							'<input type="hidden" name="user_id" value="'+ String(userId) +'" />' +
+							'<input type="hidden" name="bspfy_disconnect_nonce" value="'+ String(nonce) +'" />';
+						document.body.appendChild(form); form.submit();
+					});
+			}
 
-    // Init buttons.
-    var btnTest = document.getElementById('bspfy-auth-test');
-    var btnConn = document.getElementById('bspfy-auth-connect');
-    var btnRe   = document.getElementById('bspfy-auth-reconnect');
-    var btnDis  = document.getElementById('bspfy-auth-disconnect');
+			// Init buttons.
+			var btnTest = document.getElementById('bspfy-auth-test');
+			var btnConn = document.getElementById('bspfy-auth-connect');
+			var btnRe   = document.getElementById('bspfy-auth-reconnect');
+			var btnDis  = document.getElementById('bspfy-auth-disconnect');
 
-    if (btnTest) btnTest.onclick = function(){
-        fetchJSON(base + '/token')
-            .then(function(res){
-                return (res && res.access_token)
-                    ? fetch('https://api.spotify.com/v1/me', { headers:{ Authorization:'Bearer ' + res.access_token } })
-                        .then(function(m){ return m.json(); })
-                        .then(function(me){ alert('Connected as: ' + (me.display_name || me.id || 'unknown')); })
-                    : alert('Not connected (try Connect).');
-            })
-            .catch(function(){ alert('Test failed.'); });
-    };
+			if (btnTest) btnTest.onclick = function(){
+				fetchJSON(base + '/token')
+					.then(function(res){
+						return (res && res.access_token)
+							? fetch('https://api.spotify.com/v1/me', { headers:{ Authorization:'Bearer ' + res.access_token } })
+								.then(function(m){ return m.json(); })
+								.then(function(me){ alert('Connected as: ' + (me.display_name || me.id || 'unknown')); })
+							: alert('Not connected (try Connect).');
+					})
+					.catch(function(){ alert('Test failed.'); });
+			};
 
-    if (btnConn) btnConn.onclick = connectOrReconnect;
-    if (btnRe)   btnRe.onclick   = connectOrReconnect;
-    if (btnDis)  btnDis.onclick  = doDisconnect;
+			if (btnConn) btnConn.onclick = connectOrReconnect;
+			if (btnRe)   btnRe.onclick   = connectOrReconnect;
+			if (btnDis)  btnDis.onclick  = doDisconnect;
 
-    // Only on own profile: do a quick init check.
-    var isSelfProfile = document.body.classList.contains('profile-php');
-    if (isSelfProfile) {
-        fetchJSON(base + '/token')
-            .then(function(r){ if (r && r.access_token) { toConnectedUI(); } })
-            .catch(function(){ /* ignore */ });
-    }
-})();
-});
-JS;
-
-		wp_add_inline_script( $this->betait_spfy_playlist, $inline, 'after' );
+			// Only on own profile: do a quick init check.
+			var isSelfProfile = document.body.classList.contains('profile-php');
+			if (isSelfProfile) {
+				fetchJSON(base + '/token')
+					.then(function(r){ if (r && r.access_token) { toConnectedUI(); } })
+					.catch(function(){ /* ignore */ });
+			}
+		})();
+		});
+		JS;
+wp_add_inline_script( $this->betait_spfy_playlist, $inline, 'after' );
 
 		// Ensure FA exists on these screens too (without double-enqueue).
 		if ( ! wp_style_is( 'font-awesome', 'enqueued' ) ) {
@@ -790,14 +850,14 @@ public function register_tools_settings() : void {
 }
 
 /**
- * GET-runner for engangsmigrering: normaliserer eksisterende _playlist_tracks til ren UTF-8.
- * Kalles via signert URL fra Tools & Debug-panelet.
+ * GET-runner for one-time migration: normalize exsisting _playlist_tracks to pure UTF-8.
+ * Called through signed URL from Tools & Debug-tab.
  */
 public function maybe_run_unicode_normalizer() : void {
 	if ( ! current_user_can( 'manage_options' ) ) return;
 	if ( empty( $_GET['bspfy_fix_unicode_run'] ) ) return; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
-	// Krev at togglen er på for å kunne kjøre.
+	// Demand "toggle on" to run.
 	if ( ! get_option( 'bspfy_enable_unicode_tools', 0 ) ) {
 		wp_die( esc_html__( 'Unicode tool is disabled. Enable it in Tools & Debug first.', 'betait-spfy-playlist' ), 403 );
 	}
@@ -835,13 +895,13 @@ public function maybe_run_unicode_normalizer() : void {
 		'ts'      => time(),
 	], 60 );
 
-	// Tilbake til settings-siden uten query args.
+	// Back to settings-page withouth query args.
 	wp_safe_redirect( remove_query_arg( [ 'bspfy_fix_unicode_run', '_wpnonce' ] ) );
 	exit;
 }
 
 /**
- * Enkel heuristikk for å reparere typisk mojibake i strings (Ã…/Ã˜/Ã†, â€¦ etc.)
+ * Simple  heuristics to fix mojibake in stringss (Ã…/Ã˜/Ã†, â€¦ etc.)
  */
 private function fix_mojibake_recursive( $value ) {
     if ( is_array( $value ) ) {
@@ -917,7 +977,7 @@ private function looks_fixed( $before, $after ) {
 
 
 /**
- * Viser admin notice etter migrering.
+ * Shows admin notice after migration.
  */
 public function maybe_show_unicode_notice() : void {
 	if ( ! current_user_can( 'manage_options' ) ) return;
@@ -937,5 +997,15 @@ public function maybe_show_unicode_notice() : void {
 	);
 	echo '</p></div>';
 }
+
+/** Write an overlay-root in admin footer on relevant pages. */
+public function print_overlay_container() : void {
+	if ( ! $this->is_bspfy_admin_screen() ) return;
+	echo '<div id="bspfy-overlay" class="bspfy-overlay" hidden aria-hidden="true">
+	        <div class="bspfy-overlay__backdrop"></div>
+	        <div class="bspfy-overlay__spinner" role="status" aria-live="polite" aria-label="Loading"></div>
+	      </div>';
+}
+
 
 }
