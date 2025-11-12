@@ -48,9 +48,34 @@
         });
       }
 
-      // Ensure we have an access token
+      // Determine context based on visibility and cover
+      let context = 'core';
+      if (useCover) {
+        context = 'save_playlist_with_image';
+      } else if (visibility === 'public') {
+        context = 'save_playlist_public';
+      } else {
+        context = 'save_playlist_private';
+      }
+
+      // Ensure we have an access token with proper scopes
       let accessToken;
       try {
+        // Request with context for proper scopes
+        const restRoot = window.bspfyDebug?.rest_root || (window.location.origin + '/wp-json');
+        const startResponse = await fetch(`${restRoot}/bspfy/v1/oauth/start`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            redirectBack: window.location.href,
+            context: context
+          })
+        });
+
+        // Use the existing auth helper with interactive mode
         accessToken = await window.bspfyAuth.ensureAccessToken({ interactive: true });
       } catch (e) {
         throw new Error(__('Authentication failed. Please try again.', 'betait-spfy-playlist'));

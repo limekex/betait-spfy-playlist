@@ -66,7 +66,7 @@ class Betait_Spfy_Playlist_Public {
 				if ( $post && is_a( $post, 'WP_Post' ) ) {
 					$content = $post->post_content ?? '';
 					// Keep this list in sync with your real shortcodes.
-					$shortcodes = array( 'bspfy_save_button', 'bspfy_player' );
+					$shortcodes = array( 'bspfy_save_button', 'bspfy_player', 'bspfy_save_playlist' );
 					foreach ( $shortcodes as $sc ) {
 						if ( has_shortcode( $content, $sc ) ) {
 							$should = true;
