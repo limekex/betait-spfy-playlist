@@ -74,6 +74,10 @@
       // Force re-authentication with specific context/scopes
       this.inflight = null; // Clear any cached promise
 
+      if (window.bspfySaveConfig?.debug) {
+        console.log('[Save Playlist Auth] Forcing re-auth with context:', context);
+      }
+
       const startRes = await fetch(`${REST_ROOT}/bspfy/v1/oauth/start`, {
         method: 'POST',
         headers: {
@@ -92,8 +96,16 @@
         throw new Error('No authorize URL returned');
       }
 
+      if (window.bspfySaveConfig?.debug) {
+        console.log('[Save Playlist Auth] Opening auth popup with URL:', startData.authorizeUrl);
+      }
+
       // Open auth popup
       await this.openAuthPopup(startData.authorizeUrl);
+
+      if (window.bspfySaveConfig?.debug) {
+        console.log('[Save Playlist Auth] Popup closed, fetching new token');
+      }
 
       // After auth, get token
       const tokenRes = await fetch(`${REST_ROOT}/bspfy/v1/oauth/token`, {
@@ -211,7 +223,21 @@
           // Ensure we have an access token
           if (retryCount > 0) {
             // On retry, force re-authentication with proper scopes
+            if (window.bspfyOverlay) {
+              window.bspfyOverlay.show({
+                title: __('Additional Permission Required', 'betait-spfy-playlist'),
+                busyText: __('Please grant permission to modify your playlists…', 'betait-spfy-playlist'),
+                reason: 'reauth-scopes'
+              });
+            }
             await auth.forceReauth(context);
+            if (window.bspfyOverlay) {
+              window.bspfyOverlay.show({
+                title: __('Saving to Spotify', 'betait-spfy-playlist'),
+                busyText: __('Creating your playlist…', 'betait-spfy-playlist'),
+                reason: 'save-playlist'
+              });
+            }
           }
 
           // Call the save endpoint
@@ -236,9 +262,15 @@
           // Check for scope error (403 with insufficient scope message)
           if (response.status === 403 && data.message && data.message.toLowerCase().includes('scope')) {
             if (retryCount === 0) {
+              if (window.bspfySaveConfig?.debug) {
+                console.log('[Save Playlist] Scope error detected, triggering re-auth with context:', context);
+              }
               lastError = new Error('Re-authenticating with required scopes...');
               retryCount++;
               continue; // Retry with re-auth
+            } else {
+              // Already retried, fail with clear message
+              throw new Error(__('Unable to save playlist. Please try logging out and back in.', 'betait-spfy-playlist'));
             }
           }
 
