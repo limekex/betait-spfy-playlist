@@ -70,6 +70,46 @@
       return this.inflight;
     },
 
+    async forceReauth(context) {
+      // Force re-authentication with specific context/scopes
+      this.inflight = null; // Clear any cached promise
+
+      const startRes = await fetch(`${REST_ROOT}/bspfy/v1/oauth/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(WP_NONCE ? { 'X-WP-Nonce': WP_NONCE } : {})
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          redirectBack: window.location.href,
+          context: context
+        })
+      });
+
+      const startData = await startRes.json();
+      if (!startData.authorizeUrl) {
+        throw new Error('No authorize URL returned');
+      }
+
+      // Open auth popup
+      await this.openAuthPopup(startData.authorizeUrl);
+
+      // After auth, get token
+      const tokenRes = await fetch(`${REST_ROOT}/bspfy/v1/oauth/token`, {
+        credentials: 'include',
+        cache: 'no-store',
+        headers: WP_NONCE ? { 'X-WP-Nonce': WP_NONCE } : {}
+      });
+      
+      const tokenData = await tokenRes.json();
+      if (tokenData.authenticated && tokenData.access_token) {
+        return tokenData.access_token;
+      }
+
+      throw new Error('Re-authentication failed');
+    },
+
     openAuthPopup(url) {
       return new Promise((resolve, reject) => {
         const w = 520, h = 680;
@@ -162,40 +202,73 @@
         context = 'save_playlist_private';
       }
 
-      // Ensure we have an access token with proper scopes
-      await auth.ensureAccessToken(context);
+      // Try to save, with retry on scope error
+      let retryCount = 0;
+      let lastError = null;
 
-      // Call the save endpoint
+      while (retryCount < 2) {
+        try {
+          // Ensure we have an access token
+          if (retryCount > 0) {
+            // On retry, force re-authentication with proper scopes
+            await auth.forceReauth(context);
+          }
 
-      const response = await fetch(`${REST_ROOT}/bspfy/v1/playlist/save`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(WP_NONCE ? { 'X-WP-Nonce': WP_NONCE } : {})
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          post_id: parseInt(postId, 10),
-          visibility: visibility,
-          title: title,
-          description: description,
-          use_cover: useCover
-        })
-      });
+          // Call the save endpoint
+          const response = await fetch(`${REST_ROOT}/bspfy/v1/playlist/save`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(WP_NONCE ? { 'X-WP-Nonce': WP_NONCE } : {})
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              post_id: parseInt(postId, 10),
+              visibility: visibility,
+              title: title,
+              description: description,
+              use_cover: useCover
+            })
+          });
 
-      const data = await response.json();
+          const data = await response.json();
 
-      if (window.bspfyOverlay) {
-        window.bspfyOverlay.hide();
+          // Check for scope error (403 with insufficient scope message)
+          if (response.status === 403 && data.message && data.message.toLowerCase().includes('scope')) {
+            if (retryCount === 0) {
+              lastError = new Error('Re-authenticating with required scopes...');
+              retryCount++;
+              continue; // Retry with re-auth
+            }
+          }
+
+          if (window.bspfyOverlay) {
+            window.bspfyOverlay.hide();
+          }
+
+          if (!response.ok || !data.success) {
+            const errorMsg = data.message || data.error || __('Failed to save playlist.', 'betait-spfy-playlist');
+            throw new Error(errorMsg);
+          }
+
+          // Success!
+          showSuccess(data, btn);
+          return; // Exit function on success
+
+        } catch (err) {
+          if (retryCount === 0 && err.message && err.message.includes('scope')) {
+            lastError = err;
+            retryCount++;
+            continue; // Retry
+          }
+          throw err; // Re-throw if not a scope error or already retried
+        }
       }
 
-      if (!response.ok || !data.success) {
-        const errorMsg = data.message || data.error || __('Failed to save playlist.', 'betait-spfy-playlist');
-        throw new Error(errorMsg);
+      // If we get here, we exhausted retries
+      if (lastError) {
+        throw lastError;
       }
-
-      // Success!
-      showSuccess(data, btn);
 
     } catch (error) {
       if (window.bspfyOverlay) {
