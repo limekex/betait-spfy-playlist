@@ -62,7 +62,7 @@
       let accessToken;
       try {
         // Request with context for proper scopes
-        const restRoot = window.bspfyDebug?.rest_root || (window.location.origin + '/wp-json');
+        const restRoot = (window.bspfyDebug?.rest_root || (window.location.origin + '/wp-json')).replace(/\/$/, '');
         const startResponse = await fetch(`${restRoot}/bspfy/v1/oauth/start`, {
           method: 'POST',
           headers: {
@@ -82,10 +82,10 @@
       }
 
       // Call the save endpoint
-      const restRoot = window.bspfyDebug?.rest_root || (window.location.origin + '/wp-json');
+      const restRoot2 = (window.bspfyDebug?.rest_root || (window.location.origin + '/wp-json')).replace(/\/$/, '');
       const wpNonce = window.bspfyDebug?.rest_nonce || window.wpApiSettings?.nonce || '';
 
-      const response = await fetch(`${restRoot}/bspfy/v1/playlist/save`, {
+      const response = await fetch(`${restRoot2}/bspfy/v1/playlist/save`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
