@@ -182,37 +182,28 @@ class Betait_Spfy_Playlist_Public {
 			true
 		);
 
-		// 4) Save to Spotify JS (depends on admin JS for auth helpers).
+		// 4) Save to Spotify JS (standalone, no admin JS dependency).
 		if ( (int) get_option( 'bspfy_save_playlist_enabled', 1 ) === 1 ) {
-			// Load admin JS for auth helpers.
-			wp_enqueue_script(
-				'betait-spfy-playlist-admin',
-				plugin_dir_url( dirname( __FILE__ ) ) . 'admin/js/betait-spfy-playlist-admin.js',
-				array( 'jquery', 'bspfy-overlay' ),
-				$ver,
-				true
-			);
-
-			// Expose debug config for admin JS auth helpers.
-			wp_localize_script(
-				'betait-spfy-playlist-admin',
-				'bspfyDebug',
-				array(
-					'debug'      => (bool) get_option( 'bspfy_debug', 0 ),
-					'rest_root'  => esc_url_raw( rest_url() ),
-					'rest_nonce' => is_user_logged_in() ? wp_create_nonce( 'wp_rest' ) : '',
-				)
-			);
-
 			wp_enqueue_script(
 				'bspfy-save-playlist',
 				plugins_url(
 					'assets/js/bspfy-save-playlist.js',
 					defined( 'BETAIT_SPFY_PLAYLIST_FILE' ) ? BETAIT_SPFY_PLAYLIST_FILE : ''
 				),
-				array( 'betait-spfy-playlist-admin', 'bspfy-overlay' ),
+				array( 'bspfy-overlay' ),
 				$ver,
 				true
+			);
+
+			// Expose config for save playlist JS.
+			wp_localize_script(
+				'bspfy-save-playlist',
+				'bspfySaveConfig',
+				array(
+					'rest_root'  => esc_url_raw( rest_url() ),
+					'rest_nonce' => is_user_logged_in() ? wp_create_nonce( 'wp_rest' ) : '',
+					'debug'      => (bool) get_option( 'bspfy_debug', 0 ),
+				)
 			);
 		}
 

@@ -1,6 +1,110 @@
-/* global window, document, bspfyOverlay, bspfyAuth */
+/* global window, document, bspfyOverlay, bspfySaveConfig */
 (function () {
   'use strict';
+
+  // Get config
+  const REST_ROOT = (window.bspfySaveConfig?.rest_root || (window.location.origin + '/wp-json')).replace(/\/$/, '');
+  const WP_NONCE = window.bspfySaveConfig?.rest_nonce || '';
+
+  // Simple auth helper for save playlist (standalone, no admin JS dependency)
+  const auth = {
+    inflight: null,
+
+    async ensureAccessToken(context) {
+      if (this.inflight) return this.inflight;
+
+      this.inflight = (async () => {
+        try {
+          // Check if we have a token
+          const tokenRes = await fetch(`${REST_ROOT}/bspfy/v1/oauth/token`, {
+            credentials: 'include',
+            cache: 'no-store',
+            headers: WP_NONCE ? { 'X-WP-Nonce': WP_NONCE } : {}
+          });
+          
+          const tokenData = await tokenRes.json();
+          if (tokenData.authenticated && tokenData.access_token) {
+            return tokenData.access_token;
+          }
+
+          // Need to authenticate - start auth popup
+          const startRes = await fetch(`${REST_ROOT}/bspfy/v1/oauth/start`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(WP_NONCE ? { 'X-WP-Nonce': WP_NONCE } : {})
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              redirectBack: window.location.href,
+              context: context
+            })
+          });
+
+          const startData = await startRes.json();
+          if (!startData.authorizeUrl) {
+            throw new Error('No authorize URL returned');
+          }
+
+          // Open auth popup
+          await this.openAuthPopup(startData.authorizeUrl);
+
+          // After auth, get token again
+          const tokenRes2 = await fetch(`${REST_ROOT}/bspfy/v1/oauth/token`, {
+            credentials: 'include',
+            cache: 'no-store',
+            headers: WP_NONCE ? { 'X-WP-Nonce': WP_NONCE } : {}
+          });
+          
+          const tokenData2 = await tokenRes2.json();
+          if (tokenData2.authenticated && tokenData2.access_token) {
+            return tokenData2.access_token;
+          }
+
+          throw new Error('Authentication failed');
+        } finally {
+          this.inflight = null;
+        }
+      })();
+
+      return this.inflight;
+    },
+
+    openAuthPopup(url) {
+      return new Promise((resolve, reject) => {
+        const w = 520, h = 680;
+        const left = window.screenX + (window.outerWidth - w) / 2;
+        const top = window.screenY + (window.outerHeight - h) / 2;
+        const popup = window.open(url, 'bspfy-auth', `width=${w},height=${h},left=${left},top=${top}`);
+        
+        if (!popup) {
+          reject(new Error('Popup blocked'));
+          return;
+        }
+
+        const handler = (ev) => {
+          if (ev.origin !== window.location.origin) return;
+          if (ev.data && ev.data.type === 'bspfy-auth' && ev.data.success) {
+            window.removeEventListener('message', handler);
+            clearInterval(closedCheck);
+            try { popup.close(); } catch (e) {}
+            resolve(true);
+          }
+        };
+        window.addEventListener('message', handler);
+
+        const closedCheck = setInterval(() => {
+          try {
+            if (!popup || popup.closed) {
+              clearInterval(closedCheck);
+              window.removeEventListener('message', handler);
+              reject(new Error('Popup closed'));
+            }
+          } catch (e) {}
+        }, 1000);
+      });
+    }
+  };
 
   // Wait for DOM ready
   if (document.readyState === 'loading') {
@@ -59,37 +163,15 @@
       }
 
       // Ensure we have an access token with proper scopes
-      let accessToken;
-      try {
-        // Request with context for proper scopes
-        const restRoot = (window.bspfyDebug?.rest_root || (window.location.origin + '/wp-json')).replace(/\/$/, '');
-        const startResponse = await fetch(`${restRoot}/bspfy/v1/oauth/start`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            redirectBack: window.location.href,
-            context: context
-          })
-        });
-
-        // Use the existing auth helper with interactive mode
-        accessToken = await window.bspfyAuth.ensureAccessToken({ interactive: true });
-      } catch (e) {
-        throw new Error(__('Authentication failed. Please try again.', 'betait-spfy-playlist'));
-      }
+      await auth.ensureAccessToken(context);
 
       // Call the save endpoint
-      const restRoot2 = (window.bspfyDebug?.rest_root || (window.location.origin + '/wp-json')).replace(/\/$/, '');
-      const wpNonce = window.bspfyDebug?.rest_nonce || window.wpApiSettings?.nonce || '';
 
-      const response = await fetch(`${restRoot2}/bspfy/v1/playlist/save`, {
+      const response = await fetch(`${REST_ROOT}/bspfy/v1/playlist/save`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-WP-Nonce': wpNonce
+          ...(WP_NONCE ? { 'X-WP-Nonce': WP_NONCE } : {})
         },
         credentials: 'include',
         body: JSON.stringify({
