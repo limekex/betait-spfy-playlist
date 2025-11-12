@@ -93,6 +93,8 @@ class Betait_Spfy_Playlist {
 		require_once $base . 'admin/class-betait-spfy-playlist-cpt.php';
 		require_once $base . 'admin/class-betait-spfy-playlist-ajax.php';
 		require_once $base . 'includes/class-betait-spfy-playlist-oauth.php';
+		require_once $base . 'includes/class-betait-spfy-playlist-save-handler.php';
+		require_once $base . 'includes/template-functions.php';
 
 		// Public frontend.
 		require_once $base . 'public/class-betait-spfy-playlist-public.php';
@@ -127,6 +129,7 @@ class Betait_Spfy_Playlist {
 		$plugin_cpt   = new Betait_Spfy_Playlist_CPT();
 		$plugin_ajax  = new Betait_Spfy_Playlist_Ajax();
 		$this->oauth  = new Betait_Spfy_Playlist_OAuth();
+		$plugin_save  = new Betait_Spfy_Playlist_Save_Handler();
 
 		// Assets.
 		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_styles' );

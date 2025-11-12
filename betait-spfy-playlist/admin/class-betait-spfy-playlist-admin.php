@@ -301,6 +301,14 @@ class Betait_Spfy_Playlist_Admin {
 			// Tools & Debug
 			update_option('bspfy_enable_unicode_tools',isset($_POST['bspfy_enable_unicode_tools']) ? 1 : 0);
 
+			// Save to Spotify settings.
+			update_option( 'bspfy_save_playlist_enabled', isset( $_POST['bspfy_save_playlist_enabled'] ) ? 1 : 0 );
+			update_option( 'bspfy_save_playlist_default_visibility', sanitize_key( $_POST['bspfy_save_playlist_default_visibility'] ?? 'public' ) );
+			update_option( 'bspfy_save_playlist_title_template', sanitize_text_field( $_POST['bspfy_save_playlist_title_template'] ?? '{{playlistTitle}} – {{siteName}}' ) );
+			update_option( 'bspfy_save_playlist_description_template', sanitize_textarea_field( $_POST['bspfy_save_playlist_description_template'] ?? '' ) );
+			update_option( 'bspfy_save_playlist_use_cover', isset( $_POST['bspfy_save_playlist_use_cover'] ) ? 1 : 0 );
+			update_option( 'bspfy_save_playlist_button_label', sanitize_text_field( $_POST['bspfy_save_playlist_button_label'] ?? __( 'Save to Spotify', 'betait-spfy-playlist' ) ) );
+
 			echo '<div class="updated notice is-dismissible"><p>' . esc_html__( 'Settings saved!', 'betait-spfy-playlist' ) . '</p></div>';
 		}
 
@@ -398,6 +406,63 @@ class Betait_Spfy_Playlist_Admin {
 		}
 		echo '    </select>';
 		echo '    <p class="description">' . esc_html__( 'Choose a playlist layout (card or Spotify-like list).', 'betait-spfy-playlist' ) . '</p>';
+		echo '  </td>';
+		echo '</tr>';
+
+		echo '</tbody></table>';
+
+		echo '<h2 class="bspfy-h2">' . esc_html__( 'Save to Spotify', 'betait-spfy-playlist' ) . '</h2>';
+		echo '<table class="form-table"><tbody>';
+
+		$save_enabled              = (int) get_option( 'bspfy_save_playlist_enabled', 1 );
+		$save_default_visibility   = get_option( 'bspfy_save_playlist_default_visibility', 'public' );
+		$save_title_template       = get_option( 'bspfy_save_playlist_title_template', '{{playlistTitle}} – {{siteName}}' );
+		$save_description_template = get_option( 'bspfy_save_playlist_description_template', '' );
+		$save_use_cover            = (int) get_option( 'bspfy_save_playlist_use_cover', 1 );
+		$save_button_label         = get_option( 'bspfy_save_playlist_button_label', __( 'Save to Spotify', 'betait-spfy-playlist' ) );
+
+		echo '<tr>';
+		echo '  <th scope="row"><label for="bspfy_save_playlist_enabled">' . esc_html__( 'Enable "Save to Spotify"', 'betait-spfy-playlist' ) . '</label></th>';
+		echo '  <td><label><input type="checkbox" id="bspfy_save_playlist_enabled" name="bspfy_save_playlist_enabled" ' . checked( 1, $save_enabled, false ) . ' /> ' . esc_html__( 'Allow visitors to save playlists to their Spotify account.', 'betait-spfy-playlist' ) . '</label></td>';
+		echo '</tr>';
+
+		echo '<tr>';
+		echo '  <th scope="row"><label for="bspfy_save_playlist_default_visibility">' . esc_html__( 'Default visibility', 'betait-spfy-playlist' ) . '</label></th>';
+		echo '  <td>';
+		echo '    <select id="bspfy_save_playlist_default_visibility" name="bspfy_save_playlist_default_visibility">';
+		echo '      <option value="public"' . selected( $save_default_visibility, 'public', false ) . '>' . esc_html__( 'Public', 'betait-spfy-playlist' ) . '</option>';
+		echo '      <option value="private"' . selected( $save_default_visibility, 'private', false ) . '>' . esc_html__( 'Private', 'betait-spfy-playlist' ) . '</option>';
+		echo '    </select>';
+		echo '    <p class="description">' . esc_html__( 'Default visibility for saved playlists.', 'betait-spfy-playlist' ) . '</p>';
+		echo '  </td>';
+		echo '</tr>';
+
+		echo '<tr>';
+		echo '  <th scope="row"><label for="bspfy_save_playlist_title_template">' . esc_html__( 'Playlist title template', 'betait-spfy-playlist' ) . '</label></th>';
+		echo '  <td>';
+		echo '    <input type="text" id="bspfy_save_playlist_title_template" name="bspfy_save_playlist_title_template" class="regular-text" value="' . esc_attr( $save_title_template ) . '" />';
+		echo '    <p class="description">' . esc_html__( 'Use {{playlistTitle}} and {{siteName}} as placeholders.', 'betait-spfy-playlist' ) . '</p>';
+		echo '  </td>';
+		echo '</tr>';
+
+		echo '<tr>';
+		echo '  <th scope="row"><label for="bspfy_save_playlist_description_template">' . esc_html__( 'Playlist description template', 'betait-spfy-playlist' ) . '</label></th>';
+		echo '  <td>';
+		echo '    <textarea id="bspfy_save_playlist_description_template" name="bspfy_save_playlist_description_template" class="large-text" rows="3">' . esc_textarea( $save_description_template ) . '</textarea>';
+		echo '    <p class="description">' . esc_html__( 'Description for saved playlists. Use {{playlistTitle}}, {{siteName}}, and {{playlistExcerpt}} as placeholders.', 'betait-spfy-playlist' ) . '</p>';
+		echo '  </td>';
+		echo '</tr>';
+
+		echo '<tr>';
+		echo '  <th scope="row"><label for="bspfy_save_playlist_use_cover">' . esc_html__( 'Use cover image', 'betait-spfy-playlist' ) . '</label></th>';
+		echo '  <td><label><input type="checkbox" id="bspfy_save_playlist_use_cover" name="bspfy_save_playlist_use_cover" ' . checked( 1, $save_use_cover, false ) . ' /> ' . esc_html__( 'Upload playlist featured image as cover (if available).', 'betait-spfy-playlist' ) . '</label></td>';
+		echo '</tr>';
+
+		echo '<tr>';
+		echo '  <th scope="row"><label for="bspfy_save_playlist_button_label">' . esc_html__( 'Button label', 'betait-spfy-playlist' ) . '</label></th>';
+		echo '  <td>';
+		echo '    <input type="text" id="bspfy_save_playlist_button_label" name="bspfy_save_playlist_button_label" class="regular-text" value="' . esc_attr( $save_button_label ) . '" />';
+		echo '    <p class="description">' . esc_html__( 'Text shown on the "Save to Spotify" button.', 'betait-spfy-playlist' ) . '</p>';
 		echo '  </td>';
 		echo '</tr>';
 

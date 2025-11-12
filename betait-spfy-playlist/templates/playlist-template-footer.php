@@ -43,6 +43,13 @@ $attrib_text_e = esc_html( $attrib_text );
 $logo_alt_e  = esc_attr__( 'Spotify', 'betait-spfy-playlist' );
 ?>
 
+<?php
+// Render "Save to Spotify" button if enabled.
+if ( function_exists( 'bspfy_render_save_button' ) ) {
+	bspfy_render_save_button();
+}
+?>
+
 <div class="bspfy-spotify-attribution" role="contentinfo" aria-label="<?php esc_attr_e( 'Attribution', 'betait-spfy-playlist' ); ?>">
 	<span><?php echo $attrib_text_e; ?></span>
 	<img class="bspfy-spotify-logo"
