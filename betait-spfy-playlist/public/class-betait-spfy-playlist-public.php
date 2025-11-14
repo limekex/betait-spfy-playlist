@@ -66,7 +66,7 @@ class Betait_Spfy_Playlist_Public {
 				if ( $post && is_a( $post, 'WP_Post' ) ) {
 					$content = $post->post_content ?? '';
 					// Keep this list in sync with your real shortcodes.
-					$shortcodes = array( 'bspfy_save_button', 'bspfy_player' );
+					$shortcodes = array( 'bspfy_save_button', 'bspfy_player', 'bspfy_save_playlist' );
 					foreach ( $shortcodes as $sc ) {
 						if ( has_shortcode( $content, $sc ) ) {
 							$should = true;
@@ -127,6 +127,17 @@ class Betait_Spfy_Playlist_Public {
 			$ver,
 			'all'
 		);
+
+		// Save to Spotify CSS.
+		if ( (int) get_option( 'bspfy_save_playlist_enabled', 1 ) === 1 ) {
+			wp_enqueue_style(
+				'bspfy-save-playlist',
+				plugin_dir_url( __FILE__ ) . '../assets/css/bspfy-save-playlist.css',
+				array(),
+				$ver,
+				'all'
+			);
+		}
 	}
 
 	/**
@@ -170,6 +181,31 @@ class Betait_Spfy_Playlist_Public {
 			$ver,
 			true
 		);
+
+		// 4) Save to Spotify JS (standalone, no admin JS dependency).
+		if ( (int) get_option( 'bspfy_save_playlist_enabled', 1 ) === 1 ) {
+			wp_enqueue_script(
+				'bspfy-save-playlist',
+				plugins_url(
+					'assets/js/bspfy-save-playlist.js',
+					defined( 'BETAIT_SPFY_PLAYLIST_FILE' ) ? BETAIT_SPFY_PLAYLIST_FILE : ''
+				),
+				array( 'bspfy-overlay' ),
+				$ver,
+				true
+			);
+
+			// Expose config for save playlist JS.
+			wp_localize_script(
+				'bspfy-save-playlist',
+				'bspfySaveConfig',
+				array(
+					'rest_root'  => esc_url_raw( rest_url() ),
+					'rest_nonce' => is_user_logged_in() ? wp_create_nonce( 'wp_rest' ) : '',
+					'debug'      => (bool) get_option( 'bspfy_debug', 0 ),
+				)
+			);
+		}
 
 		// Expose safe configuration to the frontend (no secrets).
 		wp_localize_script(

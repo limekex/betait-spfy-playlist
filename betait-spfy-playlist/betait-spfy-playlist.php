@@ -3,7 +3,7 @@
  * Plugin Name:       BeTA iT – Spotify Playlist
  * Plugin URI:        https://betait.no/spfy
  * Description:       WordPress integration with the Spotify Web API & Web Playback SDK. Create/save playlists, search tracks, and play in-browser (Premium required for SDK playback).
- * Version:           2.5.0
+ * Version:           2.17.4
  * Author:            BeTA iT
  * Author URI:        https://betait.no
  * License:           GPL-2.0-or-later
@@ -34,7 +34,7 @@ if ( ! defined( 'BETAIT_SPFY_PLAYLIST_URL' ) ) {
 	define( 'BETAIT_SPFY_PLAYLIST_URL', plugin_dir_url( __FILE__ ) );
 }
 if ( ! defined( 'BETAIT_SPFY_PLAYLIST_VERSION' ) ) {
-	define( 'BETAIT_SPFY_PLAYLIST_VERSION', '2.0.0' ); // Keep in sync with header.
+	define( 'BETAIT_SPFY_PLAYLIST_VERSION', '2.17.4' ); // Keep in sync with header.
 }
 
 /**

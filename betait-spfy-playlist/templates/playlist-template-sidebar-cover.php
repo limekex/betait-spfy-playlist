@@ -46,4 +46,11 @@ $default_cover_e = esc_url( $default_cover );
 	     alt="<?php esc_attr_e( 'Now playing cover', 'betait-spfy-playlist' ); ?>"
 	     loading="lazy"
 	     decoding="async" />
+
+		 <?php
+// Render "Save to Spotify" button if enabled.
+if ( function_exists( 'bspfy_render_save_button' ) ) {
+	bspfy_render_save_button();
+}
+?>
 </section>

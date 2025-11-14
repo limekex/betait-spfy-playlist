@@ -16,6 +16,7 @@ This repo includes:
 * Secure **OAuth 2.0 PKCE** via WP REST endpoints under `/wp-json/bspfy/v1/oauth/*`.
 * **httpOnly** cookie token storage (configurable SameSite/Secure).
 * **Web Playback SDK** for in-browser playback *(Spotify Premium required for end users)*.
+* **Save to Spotify** – Allow visitors to save playlists to their own Spotify accounts with customizable branding.
 * Role/membership gate via `bspfy_can_play` filter.
 * Uniform error handling for 401/403/429 with silent refresh + backoff.
 * Debug flag (`BSPFY_DEBUG`) with masked logs.

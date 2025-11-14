@@ -93,6 +93,9 @@ class Betait_Spfy_Playlist {
 		require_once $base . 'admin/class-betait-spfy-playlist-cpt.php';
 		require_once $base . 'admin/class-betait-spfy-playlist-ajax.php';
 		require_once $base . 'includes/class-betait-spfy-playlist-oauth.php';
+		require_once $base . 'includes/class-betait-spfy-playlist-save-handler.php';
+		require_once $base . 'includes/class-betait-spfy-playlist-blocks.php';
+		require_once $base . 'includes/template-functions.php';
 
 		// Public frontend.
 		require_once $base . 'public/class-betait-spfy-playlist-public.php';
@@ -123,10 +126,12 @@ class Betait_Spfy_Playlist {
 	 * @return void
 	 */
 	private function define_admin_hooks() {
-		$plugin_admin = new Betait_Spfy_Playlist_Admin( $this->get_betait_spfy_playlist(), $this->get_version() );
-		$plugin_cpt   = new Betait_Spfy_Playlist_CPT();
-		$plugin_ajax  = new Betait_Spfy_Playlist_Ajax();
-		$this->oauth  = new Betait_Spfy_Playlist_OAuth();
+		$plugin_admin  = new Betait_Spfy_Playlist_Admin( $this->get_betait_spfy_playlist(), $this->get_version() );
+		$plugin_cpt    = new Betait_Spfy_Playlist_CPT();
+		$plugin_ajax   = new Betait_Spfy_Playlist_Ajax();
+		$this->oauth   = new Betait_Spfy_Playlist_OAuth();
+		$plugin_save   = new Betait_Spfy_Playlist_Save_Handler();
+		$plugin_blocks = new Betait_Spfy_Playlist_Blocks();
 
 		// Assets.
 		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_styles' );

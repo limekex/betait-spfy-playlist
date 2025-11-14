@@ -1,0 +1,166 @@
+/**
+ * Save to Spotify button styles
+ */
+
+.bspfy-save-playlist-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 1.0rem;
+    padding: 0.75rem 1.5rem;
+    background: #1db954;
+    color: #fff;
+    border: none;
+    border-radius: 500px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s 
+ease;
+    text-decoration: none;
+    line-height: 1;
+    width: stretch;
+}
+
+.bspfy-save-playlist-btn:hover {
+  background: #1ed760;
+  transform: scale(1.02);
+}
+
+.bspfy-save-playlist-btn:active {
+  transform: scale(0.98);
+}
+
+.bspfy-save-playlist-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.bspfy-save-playlist-btn[aria-busy="true"] {
+  position: relative;
+}
+
+.bspfy-save-playlist-btn[aria-busy="true"]::after {
+  content: "";
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: bspfy-spin 0.6s linear infinite;
+}
+
+@keyframes bspfy-spin {
+  to {
+    transform: translateY(-50%) rotate(360deg);
+  }
+}
+
+.bspfy-save-playlist-btn .bspfy-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: currentColor;
+}
+
+.bspfy-save-playlist-container {
+  margin: 2rem 0;
+}
+
+/* Success message */
+.bspfy-save-success {
+  margin-top: 1rem;
+  padding: 1rem 1.5rem;
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  border-radius: 0.5rem;
+  color: #155724;
+}
+
+.bspfy-save-success p {
+  margin: 0 0 0.5rem;
+}
+
+.bspfy-save-success p:last-child {
+  margin-bottom: 0;
+}
+
+.bspfy-open-spotify-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #1db954;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 500px;
+  font-weight: 600;
+  transition: background 0.2s ease;
+}
+
+.bspfy-open-spotify-link:hover {
+  background: #1ed760;
+  color: #fff;
+}
+
+.bspfy-save-stats {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+/* Error message */
+.bspfy-save-error {
+  margin: 1rem 0;
+  padding: 1rem 1.5rem;
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 0.5rem;
+  color: #721c24;
+}
+
+/* Already saved state */
+.bspfy-save-playlist-btn.bspfy-already-saved {
+  background: #535353;
+  cursor: pointer;
+}
+
+.bspfy-save-playlist-btn.bspfy-already-saved:hover {
+  background: #3e3e3e;
+}
+
+.bspfy-spotify-link-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-left: 0.75rem;
+  background: #1db954;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 50%;
+  font-size: 1.25rem;
+  transition: all 0.2s ease;
+  vertical-align: middle;
+}
+
+.bspfy-spotify-link-icon:hover {
+  background: #1ed760;
+  transform: scale(1.1);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .bspfy-save-playlist-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .bspfy-spotify-link-icon {
+    margin-left: 0.5rem;
+  }
+}
