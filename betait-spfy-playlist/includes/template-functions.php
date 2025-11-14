@@ -44,16 +44,31 @@ function bspfy_render_save_button( $post_id = null, $args = array() ) {
 
 	$args = wp_parse_args( $args, $defaults );
 
-	// Generate title and description from templates.
-	$title_template = get_option( 'bspfy_save_playlist_title_template', '{{playlistTitle}} – {{siteName}}' );
-	$title          = str_replace(
+	// Check for post-specific settings.
+	// Use custom cover if enabled for this post.
+	$post_use_cover = (bool) get_post_meta( $post_id, '_playlist_spotify_use_cover', true );
+	$has_custom_image = (bool) get_post_meta( $post_id, '_playlist_spotify_image_id', true );
+	if ( $post_use_cover && $has_custom_image ) {
+		$args['use_cover'] = true;
+	}
+
+	// Generate title from template (post-specific or global fallback).
+	$title_template = get_post_meta( $post_id, '_playlist_spotify_title_template', true );
+	if ( empty( $title_template ) ) {
+		$title_template = get_option( 'bspfy_save_playlist_title_template', '{{playlistTitle}} – {{siteName}}' );
+	}
+	$title = str_replace(
 		array( '{{playlistTitle}}', '{{siteName}}' ),
 		array( $post->post_title, get_bloginfo( 'name' ) ),
 		$title_template
 	);
 
-	$desc_template = get_option( 'bspfy_save_playlist_description_template', '' );
-	$description   = str_replace(
+	// Generate description from template (post-specific or global fallback).
+	$desc_template = get_post_meta( $post_id, '_playlist_spotify_description_template', true );
+	if ( empty( $desc_template ) ) {
+		$desc_template = get_option( 'bspfy_save_playlist_description_template', '' );
+	}
+	$description = str_replace(
 		array( '{{playlistTitle}}', '{{siteName}}', '{{playlistExcerpt}}' ),
 		array( $post->post_title, get_bloginfo( 'name' ), wp_trim_words( $post->post_excerpt, 20 ) ),
 		$desc_template

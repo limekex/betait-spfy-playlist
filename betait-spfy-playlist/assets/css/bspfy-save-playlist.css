@@ -120,10 +120,45 @@
   color: #721c24;
 }
 
+/* Already saved state */
+.bspfy-save-playlist-btn.bspfy-already-saved {
+  background: #535353;
+  cursor: pointer;
+}
+
+.bspfy-save-playlist-btn.bspfy-already-saved:hover {
+  background: #3e3e3e;
+}
+
+.bspfy-spotify-link-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-left: 0.75rem;
+  background: #1db954;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 50%;
+  font-size: 1.25rem;
+  transition: all 0.2s ease;
+  vertical-align: middle;
+}
+
+.bspfy-spotify-link-icon:hover {
+  background: #1ed760;
+  transform: scale(1.1);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .bspfy-save-playlist-btn {
     width: 100%;
     justify-content: center;
+  }
+  
+  .bspfy-spotify-link-icon {
+    margin-left: 0.5rem;
   }
 }

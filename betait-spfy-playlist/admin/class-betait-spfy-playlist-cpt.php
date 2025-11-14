@@ -284,7 +284,7 @@ class Betait_Spfy_Playlist_CPT {
 	}
 
 	/**
-	 * Render the Spotify export meta box (custom name + cover image).
+	 * Render the Spotify export meta box (custom title template, description template, cover image).
 	 *
 	 * @param WP_Post $post Post object.
 	 * @return void
@@ -297,11 +297,14 @@ class Betait_Spfy_Playlist_CPT {
 
 		wp_nonce_field( 'save_playlist_spotify_export', 'playlist_spotify_export_nonce' );
 
-		$default_name = get_the_title( $post );
-		$custom_name  = (string) get_post_meta( $post->ID, '_playlist_spotify_name', true );
-		if ( '' === $custom_name ) {
-			$custom_name = $default_name;
-		}
+		// Get global settings (fallback).
+		$global_title_template = get_option( 'bspfy_save_playlist_title_template', '{{playlistTitle}} – {{siteName}}' );
+		$global_desc_template  = get_option( 'bspfy_save_playlist_description_template', '' );
+
+		// Get post-specific settings.
+		$custom_title_template = get_post_meta( $post->ID, '_playlist_spotify_title_template', true );
+		$custom_desc_template  = get_post_meta( $post->ID, '_playlist_spotify_description_template', true );
+		$use_custom_cover      = (bool) get_post_meta( $post->ID, '_playlist_spotify_use_cover', true );
 
 		$image_id = (int) get_post_meta( $post->ID, '_playlist_spotify_image_id', true );
 		$img_src  = '';
@@ -314,12 +317,21 @@ class Betait_Spfy_Playlist_CPT {
 
 		echo '<div class="bspfy-export-box">';
 
-		// Name.
-		echo '<p><label for="playlist_spotify_name"><strong>' . esc_html__( 'Custom playlist name', 'betait-spfy-playlist' ) . '</strong></label></p>';
-		echo '<p><input type="text" id="playlist_spotify_name" name="playlist_spotify_name" class="widefat" value="' . esc_attr( $custom_name ) . '" placeholder="' . esc_attr__( 'Playlist name on Spotify', 'betait-spfy-playlist' ) . '" /></p>';
+		echo '<p class="description" style="margin-bottom:16px;">' . esc_html__( 'Configure how this playlist will be saved to Spotify. Leave fields empty to use global settings.', 'betait-spfy-playlist' ) . '</p>';
+
+		// Title template.
+		echo '<p><label for="playlist_spotify_title_template"><strong>' . esc_html__( 'Playlist title template', 'betait-spfy-playlist' ) . '</strong></label></p>';
+		echo '<p><input type="text" id="playlist_spotify_title_template" name="playlist_spotify_title_template" class="widefat" value="' . esc_attr( $custom_title_template ) . '" placeholder="' . esc_attr( $global_title_template ) . '" /></p>';
+		echo '<p class="description">' . esc_html__( 'Available placeholders: {{playlistTitle}}, {{siteName}}, {{playlistExcerpt}}', 'betait-spfy-playlist' ) . '</p>';
+
+		// Description template.
+		echo '<p style="margin-top:16px;"><label for="playlist_spotify_description_template"><strong>' . esc_html__( 'Playlist description template', 'betait-spfy-playlist' ) . '</strong></label></p>';
+		echo '<p><textarea id="playlist_spotify_description_template" name="playlist_spotify_description_template" class="widefat" rows="3" placeholder="' . esc_attr( $global_desc_template ) . '">' . esc_textarea( $custom_desc_template ) . '</textarea></p>';
+		echo '<p class="description">' . esc_html__( 'Available placeholders: {{playlistTitle}}, {{siteName}}, {{playlistExcerpt}}', 'betait-spfy-playlist' ) . '</p>';
 
 		// Image.
-		echo '<p><strong>' . esc_html__( 'Custom playlist image', 'betait-spfy-playlist' ) . '</strong></p>';
+		echo '<p style="margin-top:16px;"><strong>' . esc_html__( 'Custom playlist cover image', 'betait-spfy-playlist' ) . '</strong></p>';
+		echo '<p><label><input type="checkbox" id="playlist_spotify_use_cover" name="playlist_spotify_use_cover" value="1" ' . checked( $use_custom_cover, true, false ) . ' /> ' . esc_html__( 'Use custom cover image when saving to Spotify', 'betait-spfy-playlist' ) . '</label></p>';
 
 		echo '<div id="bspfy-cover-preview" class="' . ( $img_src ? '' : 'is-empty' ) . '" style="border:1px solid #ccd0d4;border-radius:6px;padding:6px;text-align:center;">';
 		if ( $img_src ) {
@@ -440,12 +452,34 @@ class Betait_Spfy_Playlist_CPT {
 
 		// Spotify export settings.
 		if ( isset( $_POST['playlist_spotify_export_nonce'] ) && wp_verify_nonce( $_POST['playlist_spotify_export_nonce'], 'save_playlist_spotify_export' ) ) {
-			// Name.
-			if ( isset( $_POST['playlist_spotify_name'] ) ) {
-				$name = sanitize_text_field( wp_unslash( $_POST['playlist_spotify_name'] ) );
-				update_post_meta( $post_id, '_playlist_spotify_name', $name );
-				$this->log_debug( 'Export name saved for post ID: ' . $post_id );
+			// Title template.
+			if ( isset( $_POST['playlist_spotify_title_template'] ) ) {
+				$title_template = sanitize_text_field( wp_unslash( $_POST['playlist_spotify_title_template'] ) );
+				if ( '' !== $title_template ) {
+					update_post_meta( $post_id, '_playlist_spotify_title_template', $title_template );
+					$this->log_debug( 'Export title template saved for post ID: ' . $post_id );
+				} else {
+					delete_post_meta( $post_id, '_playlist_spotify_title_template' );
+					$this->log_debug( 'Export title template cleared (using global) for post ID: ' . $post_id );
+				}
 			}
+
+			// Description template.
+			if ( isset( $_POST['playlist_spotify_description_template'] ) ) {
+				$desc_template = sanitize_textarea_field( wp_unslash( $_POST['playlist_spotify_description_template'] ) );
+				if ( '' !== $desc_template ) {
+					update_post_meta( $post_id, '_playlist_spotify_description_template', $desc_template );
+					$this->log_debug( 'Export description template saved for post ID: ' . $post_id );
+				} else {
+					delete_post_meta( $post_id, '_playlist_spotify_description_template' );
+					$this->log_debug( 'Export description template cleared (using global) for post ID: ' . $post_id );
+				}
+			}
+
+			// Use custom cover checkbox.
+			$use_cover = isset( $_POST['playlist_spotify_use_cover'] ) && '1' === $_POST['playlist_spotify_use_cover'];
+			update_post_meta( $post_id, '_playlist_spotify_use_cover', $use_cover ? 1 : 0 );
+			$this->log_debug( 'Use custom cover: ' . ( $use_cover ? 'yes' : 'no' ) . ' for post ID: ' . $post_id );
 
 			// Image (attachment ID).
 			$img_id = isset( $_POST['playlist_spotify_image_id'] ) ? absint( $_POST['playlist_spotify_image_id'] ) : 0;

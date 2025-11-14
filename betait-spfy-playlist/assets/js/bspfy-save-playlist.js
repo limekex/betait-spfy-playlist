@@ -169,12 +169,82 @@
     const buttons = document.querySelectorAll('.bspfy-save-playlist-btn');
     buttons.forEach(btn => {
       btn.addEventListener('click', handleSaveClick);
+      // Check if playlist already saved
+      checkPlaylistStatus(btn);
     });
+  }
+
+  async function checkPlaylistStatus(btn) {
+    const postId = btn.dataset.postId;
+    if (!postId) return;
+
+    try {
+      const response = await fetch(`${REST_ROOT}/bspfy/v1/playlist/status?id=${postId}`, {
+        credentials: 'include',
+        cache: 'no-store',
+        headers: WP_NONCE ? { 'X-WP-Nonce': WP_NONCE } : {}
+      });
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      
+      if (data.saved && data.spotify_url) {
+        updateButtonToSaved(btn, data.spotify_url, data.spotify_id);
+
+        if (window.bspfySaveConfig?.debug) {
+          console.log('[Save Playlist] Already saved:', data);
+        }
+      }
+    } catch (error) {
+      // Silently fail - don't interfere with normal save flow
+      if (window.bspfySaveConfig?.debug) {
+        console.log('[Save Playlist] Status check failed:', error);
+      }
+    }
+  }
+
+  function updateButtonToSaved(btn, spotifyUrl, spotifyId) {
+    // Update button to show it's already saved
+    btn.classList.add('bspfy-already-saved');
+    btn.textContent = __('Already saved to Spotify', 'betait-spfy-playlist');
+    btn.dataset.spotifyUrl = spotifyUrl;
+    btn.dataset.spotifyId = spotifyId;
+    
+    // Check if icon already exists
+    let existingIcon = btn.nextElementSibling;
+    if (existingIcon && existingIcon.classList.contains('bspfy-spotify-link-icon')) {
+      existingIcon.href = spotifyUrl;
+      return;
+    }
+    
+    // Add Spotify icon/link
+    const linkIcon = document.createElement('a');
+    linkIcon.href = spotifyUrl;
+    linkIcon.target = '_blank';
+    linkIcon.rel = 'noopener noreferrer';
+    linkIcon.className = 'bspfy-spotify-link-icon';
+    linkIcon.setAttribute('aria-label', __('Open in Spotify', 'betait-spfy-playlist'));
+    linkIcon.innerHTML = '🎵'; // Or use SVG icon
+    linkIcon.title = __('Open in Spotify', 'betait-spfy-playlist');
+    
+    // Insert icon next to button
+    if (btn.nextSibling) {
+      btn.parentNode.insertBefore(linkIcon, btn.nextSibling);
+    } else {
+      btn.parentNode.appendChild(linkIcon);
+    }
   }
 
   async function handleSaveClick(e) {
     e.preventDefault();
     const btn = e.currentTarget;
+
+    // If already saved, open Spotify instead of re-saving
+    if (btn.classList.contains('bspfy-already-saved') && btn.dataset.spotifyUrl) {
+      window.open(btn.dataset.spotifyUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
 
     // Get data from button
     const postId = btn.dataset.postId;
@@ -285,6 +355,12 @@
 
           // Success!
           showSuccess(data, btn);
+          
+          // Update button state to "Already saved" if user is logged in
+          if (data.spotify_playlist_url) {
+            updateButtonToSaved(btn, data.spotify_playlist_url, data.spotify_playlist_id);
+          }
+          
           return; // Exit function on success
 
         } catch (err) {
