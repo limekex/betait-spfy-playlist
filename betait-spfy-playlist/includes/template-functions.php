@@ -37,7 +37,7 @@ function bspfy_render_save_button( $post_id = null, $args = array() ) {
 	$defaults = array(
 		'visibility'  => get_option( 'bspfy_save_playlist_default_visibility', 'public' ),
 		'use_cover'   => (int) get_option( 'bspfy_save_playlist_use_cover', 1 ) === 1,
-		'button_text' => get_option( 'bspfy_save_playlist_button_label', __( 'Save to Spotify', 'betait-spfy-playlist' ) ),
+		'button_text' => get_option( 'bspfy_save_playlist_button_label', __( 'Save this playlist to Spotify', 'betait-spfy-playlist' ) ),
 		'show_icon'   => true,
 		'class'       => '',
 	);
