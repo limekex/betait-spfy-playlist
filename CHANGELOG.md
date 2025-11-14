@@ -9,6 +9,10 @@ This project follows **Semantic Versioning** and a simplified *Keep a Changelog*
 - Optional server‑side token refresh (cron) — under consideration.
 - Device/queue ownership policy — under consideration.
 
+## [2.5.7]
+### Added
+- "Add playlist to spotify" button and logic.
+
 ## [2.5.0]
 ### Added
 - Overlay preloader on loads towards Spotify API
