@@ -112,13 +112,16 @@ class Betait_Spfy_Playlist_Admin {
 	public function enqueue_styles() {
 		$ver = defined( 'BSPFY_DEBUG' ) && BSPFY_DEBUG ? time() : ( defined( 'BETAIT_SPFY_PLAYLIST_VERSION' ) ? BETAIT_SPFY_PLAYLIST_VERSION : $this->version );
 
-		wp_enqueue_style(
-			$this->betait_spfy_playlist,
-			plugin_dir_url( __FILE__ ) . 'css/betait-spfy-playlist-admin.css',
-			array(),
-			$ver,
-			'all'
-		);
+		// Only load main admin CSS on plugin pages
+		if ( $this->is_bspfy_admin_screen() ) {
+			wp_enqueue_style(
+				$this->betait_spfy_playlist,
+				plugin_dir_url( __FILE__ ) . 'css/betait-spfy-playlist-admin.css',
+				array(),
+				$ver,
+				'all'
+			);
+		}
 	
 		// CSS – overlay: only on relevant pages
 		if ( $this->is_bspfy_admin_screen() ) {
@@ -132,7 +135,7 @@ class Betait_Spfy_Playlist_Admin {
 	
 
 		// Avoid double-loading Font Awesome if a theme/admin already enqueues it.
-		if ( ! wp_style_is( 'font-awesome', 'enqueued' ) ) {
+		if ( $this->is_bspfy_admin_screen() && ! wp_style_is( 'font-awesome', 'enqueued' ) ) {
 			wp_enqueue_style(
 				'font-awesome',
 				'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css',
@@ -152,43 +155,46 @@ class Betait_Spfy_Playlist_Admin {
 		$ver    = defined( 'BSPFY_DEBUG' ) && BSPFY_DEBUG ? time() : ( defined( 'BETAIT_SPFY_PLAYLIST_VERSION' ) ? BETAIT_SPFY_PLAYLIST_VERSION : $this->version );
 		$handle = $this->betait_spfy_playlist;
 
-		wp_enqueue_script(
-			$handle,
-			plugin_dir_url( __FILE__ ) . 'js/betait-spfy-playlist-admin.js',
-			array( 'jquery' ),
-			$ver,
-			true
-		);
+		// Only load main admin JS on plugin pages
+		if ( $this->is_bspfy_admin_screen() ) {
+			wp_enqueue_script(
+				$handle,
+				plugin_dir_url( __FILE__ ) . 'js/betait-spfy-playlist-admin.js',
+				array( 'jquery' ),
+				$ver,
+				true
+			);
 
-			// JS – overlay: only on relevant pages + container in footer
-			if ( $this->is_bspfy_admin_screen() ) {
-				wp_enqueue_script(
-					'bspfy-overlay',
-					plugins_url( 'assets/js/bspfy-overlay.js', BETAIT_SPFY_PLAYLIST_FILE ),
-					[],
-					$ver,
-					true
-				);
-				add_action( 'admin_footer', [ $this, 'print_overlay_container' ] );
-			}
+			// Safe data for admin JS (never expose client secret here).
+			wp_localize_script(
+				$handle,
+				'bspfyDebug',
+				array(
+					'debug'        => (bool) get_option( 'bspfy_debug', false ),
+					'client_id'    => get_option( 'bspfy_client_id', '' ),
+					'ajaxurl'      => admin_url( 'admin-ajax.php' ),
+					'rest_nonce'   => wp_create_nonce( 'wp_rest' ),
+					'rest_root'    => esc_url_raw( rest_url() ),
+					'ajax_nonce'    => wp_create_nonce( 'bspfy_ajax' ),
+					'player_name'  => get_option( 'bspfy_player_name', 'BeTA iT Web Player' ),
+					'default_volume' => (float) get_option( 'bspfy_default_volume', 0.5 ), // 0..1
+					'require_premium' => (int) get_option( 'bspfy_require_premium', 1 ),
+				)
+			);
+		}
 
+		// JS – overlay: only on relevant pages + container in footer
+		if ( $this->is_bspfy_admin_screen() ) {
+			wp_enqueue_script(
+				'bspfy-overlay',
+				plugins_url( 'assets/js/bspfy-overlay.js', BETAIT_SPFY_PLAYLIST_FILE ),
+				[],
+				$ver,
+				true
+			);
+			add_action( 'admin_footer', [ $this, 'print_overlay_container' ] );
+		}
 
-		// Safe data for admin JS (never expose client secret here).
-		wp_localize_script(
-			$handle,
-			'bspfyDebug',
-			array(
-				'debug'        => (bool) get_option( 'bspfy_debug', false ),
-				'client_id'    => get_option( 'bspfy_client_id', '' ),
-				'ajaxurl'      => admin_url( 'admin-ajax.php' ),
-				'rest_nonce'   => wp_create_nonce( 'wp_rest' ),
-				'rest_root'    => esc_url_raw( rest_url() ),
-				'ajax_nonce'    => wp_create_nonce( 'bspfy_ajax' ),
-				'player_name'  => get_option( 'bspfy_player_name', 'BeTA iT Web Player' ),
-				'default_volume' => (float) get_option( 'bspfy_default_volume', 0.5 ), // 0..1
-				'require_premium' => (int) get_option( 'bspfy_require_premium', 1 ),
-			)
-		);
 
 		// Load Spotify SDK only on edit/new screens for CPT=playlist.
 		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
