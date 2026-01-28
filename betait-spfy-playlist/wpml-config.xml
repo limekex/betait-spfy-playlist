@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wpml-config>
+	<!-- 
+		WPML Configuration for BeTA iT - Spotify Playlist Plugin
+		
+		This configuration ensures that:
+		1. Playlist content (title, description) is translated
+		2. Spotify metadata (track references, URIs, etc.) is copied, not translated
+		3. Genre taxonomy is translated
+	-->
+	
+	<!-- Custom Post Types -->
+	<custom-types>
+		<!-- Make 'playlist' CPT translatable -->
+		<custom-type translate="1">playlist</custom-type>
+	</custom-types>
+	
+	<!-- Taxonomies -->
+	<taxonomies>
+		<!-- Make 'genre' taxonomy translatable -->
+		<taxonomy translate="1">genre</taxonomy>
+	</taxonomies>
+	
+	<!-- Custom Fields -->
+	<custom-fields>
+		<!-- Playlist Description - TRANSLATE (user-facing content) -->
+		<custom-field action="translate">_playlist_description</custom-field>
+		
+		<!-- Spotify Tracks JSON - COPY (Spotify API references, should not be translated) -->
+		<custom-field action="copy">_playlist_tracks</custom-field>
+		
+		<!-- Spotify Export Settings - COPY (technical metadata) -->
+		<custom-field action="copy">_playlist_spotify_title_template</custom-field>
+		<custom-field action="copy">_playlist_spotify_description_template</custom-field>
+		<custom-field action="copy">_playlist_spotify_use_cover</custom-field>
+		<custom-field action="copy">_playlist_spotify_image_id</custom-field>
+		
+		<!-- 
+			Note: By default, WPML ignores custom fields starting with underscore (_).
+			Using action="copy" or action="translate" ensures WPML processes these fields.
+			
+			action="copy" - Field value is copied from original to translation (no translation)
+			action="translate" - Field value appears in translation editor for translation
+		-->
+	</custom-fields>
+	
+	<!-- Admin Texts (Optional - for translating admin interface texts) -->
+	<admin-texts>
+		<!-- Plugin settings can be translated here if needed -->
+	</admin-texts>
+</wpml-config>
