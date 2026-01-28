@@ -574,16 +574,19 @@ async function playPrevInDom() {
         window.open(openUrl, '_blank', 'noopener');
         return;
       }
-      if (overlayAvailable) {
-        window.bspfyOverlay.show({
-          title: 'Authenticating',
-          busyText: 'Opening authentication window...',
-          reason: 'auth-popup'
-        });
+      try {
+        if (overlayAvailable) {
+          window.bspfyOverlay.show({
+            title: 'Authenticating',
+            busyText: 'Opening authentication window...',
+            reason: 'auth-popup'
+          });
+        }
+        await window.bspfyAuth.startAuthPopup();
+        await ensureTokenSingleflight();
+      } finally {
+        if (overlayAvailable) window.bspfyOverlay.hide();
       }
-      await window.bspfyAuth.startAuthPopup();
-      await ensureTokenSingleflight();
-      if (overlayAvailable) window.bspfyOverlay.hide();
     }
 
     // 2) SDK/device
@@ -601,6 +604,7 @@ async function playPrevInDom() {
 
     // 3) Samme spor → toggl play/pause
     if (currentTrackUri === trackUri) {
+      if (overlayAvailable) window.bspfyOverlay.hide();
       try { await spotifyPlayer.togglePlay(); } catch {}
       return;
     }
@@ -629,7 +633,7 @@ async function playPrevInDom() {
 
   } catch (e) {
     console.error('playTrack error', e);
-    if (typeof window.bspfyOverlay !== 'undefined') {
+    if (overlayAvailable) {
       window.bspfyOverlay.hide();
     }
     alert('Could not play the track. Please try again.');
