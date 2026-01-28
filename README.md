@@ -17,6 +17,7 @@ This repo includes:
 * **httpOnly** cookie token storage (configurable SameSite/Secure).
 * **Web Playback SDK** for in-browser playback *(Spotify Premium required for end users)*.
 * **Save to Spotify** – Allow visitors to save playlists to their own Spotify accounts with customizable branding.
+* **WPML Compatible** – Full translation support for playlist content while preserving Spotify metadata (see [WPML_TRANSLATION.md](betait-spfy-playlist/WPML_TRANSLATION.md)).
 * Role/membership gate via `bspfy_can_play` filter.
 * Uniform error handling for 401/403/429 with silent refresh + backoff.
 * Debug flag (`BSPFY_DEBUG`) with masked logs.
@@ -51,6 +52,15 @@ The plugin uses the `betait-spfy-playlist` text domain for translations. Suggest
 * [Poedit](http://www.poedit.net/)
 * [makepot](http://i18n.svn.wordpress.org/tools/trunk/)
 * [i18n](https://github.com/grappler/i18n)
+
+### Multilingual Support
+
+The plugin is fully compatible with **WPML** (WordPress Multilingual Plugin). A `wpml-config.xml` file is included to ensure:
+- Playlist titles and descriptions are translatable
+- Spotify track references and metadata are preserved across translations
+- Genre taxonomy terms can be translated
+
+For detailed setup instructions, see [WPML_TRANSLATION.md](betait-spfy-playlist/WPML_TRANSLATION.md).
 
 ## License
 

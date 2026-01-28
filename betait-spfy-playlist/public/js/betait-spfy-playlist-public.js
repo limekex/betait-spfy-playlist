@@ -552,27 +552,59 @@ async function playPrevInDom() {
    *  -------------------------------------------------------------- */
       async function playTrack(trackUri) {
   try {
+    // Show overlay while loading/authenticating
+    const overlayAvailable = typeof window.bspfyOverlay !== 'undefined';
+    
     // 1) Sørg for token – og håndter not-authenticated med popup
     try {
+      if (overlayAvailable) {
+        window.bspfyOverlay.show({
+          title: 'Connecting to Spotify',
+          busyText: 'Authenticating...',
+          reason: 'auth'
+        });
+      }
       await ensureTokenSingleflight();
+      if (overlayAvailable) window.bspfyOverlay.hide();
     } catch (_) {
+      if (overlayAvailable) window.bspfyOverlay.hide();
       const wantAuth = confirm('You need to authenticate with Spotify to play in-page.\n\nAuthenticate now? (Cancel = open in Spotify)');
       if (!wantAuth) {
         const openUrl = `https://open.spotify.com/track/${trackUri.split(':').pop()}`;
         window.open(openUrl, '_blank', 'noopener');
         return;
       }
-      await window.bspfyAuth.startAuthPopup();
-      await ensureTokenSingleflight();
+      try {
+        if (overlayAvailable) {
+          window.bspfyOverlay.show({
+            title: 'Authenticating',
+            busyText: 'Opening authentication window...',
+            reason: 'auth-popup'
+          });
+        }
+        await window.bspfyAuth.startAuthPopup();
+        await ensureTokenSingleflight();
+      } finally {
+        if (overlayAvailable) window.bspfyOverlay.hide();
+      }
     }
 
     // 2) SDK/device
     if (!spotifyPlayer || !deviceId) {
+      if (overlayAvailable) {
+        window.bspfyOverlay.show({
+          title: 'Initializing Player',
+          busyText: 'Setting up Spotify Web Player...',
+          reason: 'player-init'
+        });
+      }
       await initializeSpotifyPlayer();
+      if (overlayAvailable) window.bspfyOverlay.hide();
     }
 
     // 3) Samme spor → toggl play/pause
     if (currentTrackUri === trackUri) {
+      if (overlayAvailable) window.bspfyOverlay.hide();
       try { await spotifyPlayer.togglePlay(); } catch {}
       return;
     }
@@ -585,14 +617,25 @@ async function playPrevInDom() {
     const body = { uris, offset: { uri: trackUri }, position_ms: 0 };
 
     // 5) Kall via vår gate + single-flight wrapper
+    if (overlayAvailable) {
+      window.bspfyOverlay.show({
+        title: 'Loading Track',
+        busyText: 'Starting playback...',
+        reason: 'play'
+      });
+    }
     await bspfyFetch(`https://api.spotify.com/v1/me/player/play?device_id=${encodeURIComponent(deviceId)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    if (overlayAvailable) window.bspfyOverlay.hide();
 
   } catch (e) {
     console.error('playTrack error', e);
+    if (overlayAvailable) {
+      window.bspfyOverlay.hide();
+    }
     alert('Could not play the track. Please try again.');
   }
 }
