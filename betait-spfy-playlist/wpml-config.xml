@@ -43,9 +43,4 @@
 			action="translate" - Field value appears in translation editor for translation
 		-->
 	</custom-fields>
-	
-	<!-- Admin Texts (Optional - for translating admin interface texts) -->
-	<admin-texts>
-		<!-- Plugin settings can be translated here if needed -->
-	</admin-texts>
 </wpml-config>
