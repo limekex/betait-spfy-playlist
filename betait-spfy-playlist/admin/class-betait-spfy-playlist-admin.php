@@ -134,10 +134,11 @@ class Betait_Spfy_Playlist_Admin {
 		}
 	
 
-		// Avoid double-loading Font Awesome if a theme/admin already enqueues it.
-		if ( $this->is_bspfy_admin_screen() && ! wp_style_is( 'font-awesome', 'enqueued' ) ) {
+		// Font Awesome 6.5.0 - use plugin-specific handle to ensure correct version loads.
+		// This prevents conflicts when other plugins/themes load older versions.
+		if ( $this->is_bspfy_admin_screen() ) {
 			wp_enqueue_style(
-				'font-awesome',
+				'bspfy-font-awesome',
 				'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css',
 				array(),
 				'6.5.0',

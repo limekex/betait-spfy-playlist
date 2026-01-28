@@ -108,16 +108,15 @@ class Betait_Spfy_Playlist_Public {
 			'all'
 		);
 
-		// Font Awesome (avoid double-loading if a theme already provides it).
-		if ( ! wp_style_is( 'font-awesome', 'enqueued' ) ) {
-			wp_enqueue_style(
-				'font-awesome',
-				'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css',
-				array(),
-				'6.5.0',
-				'all'
-			);
-		}
+		// Font Awesome 6.5.0 - use plugin-specific handle to ensure correct version loads.
+		// This prevents conflicts when other plugins/themes load older versions.
+		wp_enqueue_style(
+			'bspfy-font-awesome',
+			'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css',
+			array(),
+			'6.5.0',
+			'all'
+		);
 
 		// Overlay preloader CSS.
 		wp_enqueue_style(
