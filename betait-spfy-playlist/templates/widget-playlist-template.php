@@ -164,8 +164,6 @@ $widget_id    = 'bspfy-widget-' . uniqid();
 					$album_url  = $album_id ? 'https://open.spotify.com/album/' . $album_id : '';
 					?>
 					<li class="bspfy-track-item" data-track-uri="<?php echo esc_attr( $track_uri ); ?>" data-track-index="<?php echo esc_attr( $index ); ?>">
-						<span class="bspfy-track-number"><?php echo esc_html( $track_number ); ?></span>
-						
 						<?php if ( $album_image ) : ?>
 						<img 
 							src="<?php echo esc_url( $album_image ); ?>" 

@@ -65,12 +65,10 @@ class Betait_Spfy_Playlist_Shortcode {
 		// Start output buffering.
 		ob_start();
 
-		// Use shared template.
+		// Use shared template (same as widget for consistent styling).
 		$template = plugin_dir_path( dirname( __FILE__ ) ) . 'templates/widget-playlist-template.php';
 		if ( file_exists( $template ) ) {
-			echo '<div class="bspfy-shortcode-wrapper">';
 			include $template;
-			echo '</div>';
 		}
 
 		return ob_get_clean();
