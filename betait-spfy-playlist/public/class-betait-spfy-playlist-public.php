@@ -94,16 +94,13 @@ class Betait_Spfy_Playlist_Public {
 	/**
 	 * Check if widget assets should be enqueued.
 	 *
-	 * Widget assets are only loaded when public assets are also loaded (dependency).
+	 * Widget assets are loaded when public assets load AND either:
+	 * - bspfy_playlist shortcode is present in content
+	 * - Widget is active in any sidebar
 	 *
 	 * @return bool
 	 */
 	private function should_enqueue_widget_assets() : bool {
-		// Widget assets require public assets, so if public assets aren't loading, skip.
-		if ( ! $this->should_enqueue_public_assets() ) {
-			return false;
-		}
-
 		// Check for bspfy_playlist shortcode.
 		if ( is_singular() ) {
 			$post = get_post();

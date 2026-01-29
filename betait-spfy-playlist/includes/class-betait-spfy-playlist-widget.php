@@ -45,6 +45,9 @@ class Betait_Spfy_Playlist_Widget extends WP_Widget {
 			return;
 		}
 
+		// Enqueue widget assets directly when widget is rendered (most reliable method).
+		$this->enqueue_widget_assets();
+
 		// Parse display options.
 		$options = array(
 			'show_title'  => isset( $instance['show_title'] ) ? (bool) $instance['show_title'] : true,
@@ -63,6 +66,35 @@ class Betait_Spfy_Playlist_Widget extends WP_Widget {
 		}
 
 		echo $args['after_widget']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+	}
+
+	/**
+	 * Enqueue widget-specific assets.
+	 * Called when widget is actually rendered to ensure assets load.
+	 *
+	 * @return void
+	 */
+	private function enqueue_widget_assets() {
+		$plugin_version = defined( 'BETAIT_SPFY_PLAYLIST_VERSION' ) ? BETAIT_SPFY_PLAYLIST_VERSION : '1.0.0';
+		$ver = ( defined( 'BSPFY_DEBUG' ) && BSPFY_DEBUG ) ? time() : $plugin_version;
+
+		// Enqueue widget CSS.
+		wp_enqueue_style(
+			'bspfy-widget',
+			plugin_dir_url( dirname( __FILE__ ) ) . 'public/css/betait-spfy-playlist-widget.css',
+			array(),
+			$ver,
+			'all'
+		);
+
+		// Enqueue widget JS.
+		wp_enqueue_script(
+			'bspfy-widget',
+			plugin_dir_url( dirname( __FILE__ ) ) . 'public/js/betait-spfy-playlist-widget.js',
+			array( 'jquery', 'betait-spfy-playlist' ),
+			$ver,
+			true
+		);
 	}
 
 	/**
