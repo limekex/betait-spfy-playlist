@@ -50,6 +50,7 @@ class Betait_Spfy_Playlist_Public {
 	 * Decide whether public assets should load on the current request.
 	 *
 	 * By default: load on single playlist screens or if a known shortcode is present.
+	 * Also loads if widget assets are needed (since widget JS depends on public JS).
 	 * Developers can override via the 'bspfy_should_enqueue_public' filter.
 	 *
 	 * @return bool
@@ -75,6 +76,11 @@ class Betait_Spfy_Playlist_Public {
 					}
 				}
 			}
+
+			// Check if widget is active - public assets needed for widget JS dependencies.
+			if ( ! $should && is_active_widget( false, false, 'bspfy_playlist_widget', true ) ) {
+				$should = true;
+			}
 		}
 
 		/**
@@ -88,31 +94,17 @@ class Betait_Spfy_Playlist_Public {
 	/**
 	 * Check if widget assets should be enqueued.
 	 *
+	 * Widget assets are only loaded when public assets are also loaded (dependency).
+	 *
 	 * @return bool
 	 */
 	private function should_enqueue_widget_assets() : bool {
-		// Widget assets depend on public assets, so check that first.
+		// Widget assets require public assets, so if public assets aren't loading, skip.
 		if ( ! $this->should_enqueue_public_assets() ) {
-			// Check for bspfy_playlist shortcode which triggers both public and widget assets.
-			if ( is_singular() ) {
-				$post = get_post();
-				if ( $post && is_a( $post, 'WP_Post' ) ) {
-					$content = $post->post_content ?? '';
-					if ( has_shortcode( $content, 'bspfy_playlist' ) ) {
-						return true;
-					}
-				}
-			}
-
-			// Check if widget is active - only load if public assets will also load.
-			if ( is_active_widget( false, false, 'bspfy_playlist_widget', true ) ) {
-				return true;
-			}
-
 			return false;
 		}
 
-		// Public assets are loading, check if we need widget-specific assets.
+		// Check for bspfy_playlist shortcode.
 		if ( is_singular() ) {
 			$post = get_post();
 			if ( $post && is_a( $post, 'WP_Post' ) ) {
