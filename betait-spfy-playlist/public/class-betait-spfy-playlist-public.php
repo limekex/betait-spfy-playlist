@@ -66,7 +66,7 @@ class Betait_Spfy_Playlist_Public {
 				if ( $post && is_a( $post, 'WP_Post' ) ) {
 					$content = $post->post_content ?? '';
 					// Keep this list in sync with your real shortcodes.
-					$shortcodes = array( 'bspfy_save_button', 'bspfy_player', 'bspfy_save_playlist' );
+					$shortcodes = array( 'bspfy_save_button', 'bspfy_player', 'bspfy_save_playlist', 'bspfy_playlist' );
 					foreach ( $shortcodes as $sc ) {
 						if ( has_shortcode( $content, $sc ) ) {
 							$should = true;
@@ -83,6 +83,31 @@ class Betait_Spfy_Playlist_Public {
 		 * @param bool $should Current decision.
 		 */
 		return (bool) apply_filters( 'bspfy_should_enqueue_public', $should );
+	}
+
+	/**
+	 * Check if widget assets should be enqueued.
+	 *
+	 * @return bool
+	 */
+	private function should_enqueue_widget_assets() : bool {
+		// Check for bspfy_playlist shortcode.
+		if ( is_singular() ) {
+			$post = get_post();
+			if ( $post && is_a( $post, 'WP_Post' ) ) {
+				$content = $post->post_content ?? '';
+				if ( has_shortcode( $content, 'bspfy_playlist' ) ) {
+					return true;
+				}
+			}
+		}
+
+		// Check if widget is active in any sidebar.
+		if ( is_active_widget( false, false, 'bspfy_playlist_widget', true ) ) {
+			return true;
+		}
+
+		return (bool) apply_filters( 'bspfy_should_enqueue_widget', false );
 	}
 
 	/**
@@ -132,6 +157,17 @@ class Betait_Spfy_Playlist_Public {
 			wp_enqueue_style(
 				'bspfy-save-playlist',
 				plugin_dir_url( __FILE__ ) . '../assets/css/bspfy-save-playlist.css',
+				array(),
+				$ver,
+				'all'
+			);
+		}
+
+		// Widget CSS (conditional).
+		if ( $this->should_enqueue_widget_assets() ) {
+			wp_enqueue_style(
+				'bspfy-widget',
+				plugin_dir_url( __FILE__ ) . 'css/betait-spfy-playlist-widget.css',
 				array(),
 				$ver,
 				'all'
@@ -229,6 +265,17 @@ class Betait_Spfy_Playlist_Public {
 				'strict_samesite' => (bool) apply_filters( 'bspfy_strict_samesite', (bool) get_option( 'bspfy_strict_samesite', 0 ) ),
 			)
 		);
+
+		// Widget JS (conditional).
+		if ( $this->should_enqueue_widget_assets() ) {
+			wp_enqueue_script(
+				'bspfy-widget',
+				plugin_dir_url( __FILE__ ) . 'js/betait-spfy-playlist-widget.js',
+				array( 'jquery', $this->betait_spfy_playlist ),
+				$ver,
+				true
+			);
+		}
 	}
 
 	/**
