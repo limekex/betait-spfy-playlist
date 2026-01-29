@@ -408,11 +408,22 @@
 	border-radius: 50%;
 	transition: all 0.2s ease;
 	outline: none;
-	opacity: 0;
+	opacity: 0.3; /* Make slightly visible by default so users can discover it */
 	position: relative;
 }
 
 .bspfy-track-item:hover .bspfy-track-more {
+	opacity: 1;
+}
+
+/* In widget sidebars, make menu more visible since hover may be less intuitive */
+.widget .bspfy-track-more,
+aside .bspfy-track-more {
+	opacity: 0.5; /* More visible in sidebars */
+}
+
+.widget .bspfy-track-item:hover .bspfy-track-more,
+aside .bspfy-track-item:hover .bspfy-track-more {
 	opacity: 1;
 }
 
@@ -444,6 +455,13 @@
 	min-width: 160px;
 	z-index: 1000;
 	overflow: hidden;
+}
+
+/* In narrow widget sidebars, adjust menu width to fit */
+.widget .bspfy-track-more-menu,
+aside .bspfy-track-more-menu {
+	min-width: 140px; /* Slightly narrower for sidebars */
+	right: -8px; /* Offset slightly to prevent clipping */
 }
 
 .bspfy-track-more-menu[hidden] {

@@ -93,29 +93,33 @@ class Betait_Spfy_Playlist_Shortcode {
 			return $content;
 		}
 		
-		// First, remove <p> tags immediately before/after our markers.
-		// This handles wpautop wrapping the entire shortcode output.
-		$content = preg_replace( '/<\/p>\s*<!--bspfy-start-->/', '<!--bspfy-start-->', $content );
-		$content = preg_replace( '/<!--bspfy-start-->\s*<p>/', '<!--bspfy-start-->', $content );
-		$content = preg_replace( '/<\/p>\s*<!--bspfy-end-->/', '<!--bspfy-end-->', $content );
-		$content = preg_replace( '/<!--bspfy-end-->\s*<p>/', '<!--bspfy-end-->', $content );
+		// Strategy: Remove ALL p tags around the widget container.
+		// WordPress wpautop adds p tags in various ways, so we need to be aggressive.
 		
-		// Match content between our markers and clean it up.
+		// First, extract and clean the content between markers.
 		$pattern = '/<!--bspfy-start-->(.*?)<!--bspfy-end-->/s';
 		$content = preg_replace_callback( $pattern, function( $matches ) {
 			$output = $matches[1];
 			
-			// Remove unwanted <p> and <br> tags that wpautop added.
-			$output = preg_replace( '/<p>\s*<\/p>/', '', $output );          // Empty paragraphs
-			$output = preg_replace( '/<p>(\s*)<\/p>/', '', $output );        // Paragraphs with only whitespace
-			$output = preg_replace( '/<br\s*\/?\s*>/', '', $output );        // Line breaks
-			$output = preg_replace( '/<p>(\s*)/', '', $output );             // Opening <p> tags
-			$output = preg_replace( '/(\s*)<\/p>/', '', $output );           // Closing </p> tags
+			// Remove ALL <p> and </p> tags from the shortcode output.
+			$output = preg_replace( '/<\/?p[^>]*>/', '', $output );
+			
+			// Remove line breaks that wpautop added.
+			$output = preg_replace( '/<br\s*\/?\s*>/', '', $output );
+			
+			// Trim whitespace.
+			$output = trim( $output );
 			
 			return $output;
 		}, $content );
 		
-		// Finally, remove the marker comments themselves.
+		// Remove any remaining p tags immediately adjacent to our markers.
+		$content = preg_replace( '/<\/p>\s*<!--bspfy-start-->/', '<!--bspfy-start-->', $content );
+		$content = preg_replace( '/<!--bspfy-start-->\s*<p[^>]*>/', '<!--bspfy-start-->', $content );
+		$content = preg_replace( '/<\/p>\s*<!--bspfy-end-->/', '<!--bspfy-end-->', $content );
+		$content = preg_replace( '/<!--bspfy-end-->\s*<p[^>]*>/', '<!--bspfy-end-->', $content );
+		
+		// Remove the marker comments themselves.
 		$content = str_replace( array( '<!--bspfy-start-->', '<!--bspfy-end-->' ), '', $content );
 		
 		return $content;
