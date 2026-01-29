@@ -366,6 +366,35 @@
     },
 
     /**
+     * Wait for player device to be ready
+     * The 'ready' event must fire before we can use device_id
+     */
+    waitForDeviceReady: function (player, timeout = 5000) {
+      return new Promise((resolve, reject) => {
+        // Check if already ready
+        if (player.device_id) {
+          resolve(player.device_id);
+          return;
+        }
+
+        // Set up timeout
+        const timeoutId = setTimeout(() => {
+          reject(new Error('Timeout waiting for device to be ready'));
+        }, timeout);
+
+        // Wait for ready event
+        const readyListener = ({ device_id }) => {
+          clearTimeout(timeoutId);
+          player.device_id = device_id;
+          resolve(device_id);
+        };
+
+        // Add listener (will be called if player becomes ready)
+        player.addListener('ready', readyListener);
+      });
+    },
+
+    /**
      * Toggle play/pause for a widget
      */
     togglePlayPause: async function (widgetId) {
@@ -416,6 +445,10 @@
       try {
         instance.isInitializing = true;
         const player = await self.ensurePlayer();
+        
+        // Wait for device to be ready before attempting playback
+        await self.waitForDeviceReady(player);
+        
         const track = instance.tracks[trackIndex];
         const token = await window.bspfyAuth.ensureAccessToken();
 
@@ -448,6 +481,8 @@
           instance.isPlaying = true;
           instance.isInitializing = false;
           self.hideLoader(widgetId);
+        } else {
+          throw new Error('Device ID not available after waiting');
         }
       } catch (error) {
         console.error('Failed to play track:', error);

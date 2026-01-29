@@ -93,6 +93,13 @@ class Betait_Spfy_Playlist_Shortcode {
 			return $content;
 		}
 		
+		// First, remove <p> tags immediately before/after our markers.
+		// This handles wpautop wrapping the entire shortcode output.
+		$content = preg_replace( '/<\/p>\s*<!--bspfy-start-->/', '<!--bspfy-start-->', $content );
+		$content = preg_replace( '/<!--bspfy-start-->\s*<p>/', '<!--bspfy-start-->', $content );
+		$content = preg_replace( '/<\/p>\s*<!--bspfy-end-->/', '<!--bspfy-end-->', $content );
+		$content = preg_replace( '/<!--bspfy-end-->\s*<p>/', '<!--bspfy-end-->', $content );
+		
 		// Match content between our markers and clean it up.
 		$pattern = '/<!--bspfy-start-->(.*?)<!--bspfy-end-->/s';
 		$content = preg_replace_callback( $pattern, function( $matches ) {
@@ -107,6 +114,9 @@ class Betait_Spfy_Playlist_Shortcode {
 			
 			return $output;
 		}, $content );
+		
+		// Finally, remove the marker comments themselves.
+		$content = str_replace( array( '<!--bspfy-start-->', '<!--bspfy-end-->' ), '', $content );
 		
 		return $content;
 	}
