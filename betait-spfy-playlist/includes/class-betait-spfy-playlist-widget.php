@@ -169,7 +169,6 @@ class Betait_Spfy_Playlist_Widget extends WP_Widget {
 				value="<?php echo esc_attr( $limit ); ?>" />
 		</p>
 		<?php
-		return '';
 	}
 
 	/**

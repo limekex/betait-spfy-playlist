@@ -17,6 +17,11 @@
     spotifyPlayer: null,
 
     /**
+     * Player initialization promise (to prevent race conditions)
+     */
+    playerInitPromise: null,
+
+    /**
      * Currently active widget ID
      */
     activeWidgetId: null,
@@ -132,67 +137,77 @@
         return self.spotifyPlayer;
       }
 
-      // Need to initialize player
-      try {
-        // Get access token
-        const token = await window.bspfyAuth.ensureAccessToken();
-        
-        // Wait for SDK to be ready
-        await self.waitForSpotifySDK();
-
-        // Get player config
-        const playerName = window.bspfyPublic?.player_name || 'BeTA iT Web Player';
-        const defaultVolume = window.bspfyPublic?.default_volume || 0.5;
-
-        // Create player
-        const player = new window.Spotify.Player({
-          name: playerName,
-          getOAuthToken: cb => {
-            window.bspfyAuth.ensureAccessToken()
-              .then(token => cb(token))
-              .catch(err => {
-                console.error('Failed to get token:', err);
-                cb('');
-              });
-          },
-          volume: defaultVolume
-        });
-
-        // Set up event listeners
-        player.addListener('ready', ({ device_id }) => {
-          console.log('Spotify player ready with Device ID', device_id);
-          player.device_id = device_id;
-        });
-
-        player.addListener('not_ready', ({ device_id }) => {
-          console.log('Device ID has gone offline', device_id);
-        });
-
-        player.addListener('player_state_changed', state => {
-          if (state) {
-            self.onPlayerStateChanged(state);
-          }
-        });
-
-        // Connect player
-        const connected = await player.connect();
-        if (!connected) {
-          throw new Error('Failed to connect Spotify player');
-        }
-
-        self.spotifyPlayer = player;
-        window.spotifyPlayer = player;
-
-        return player;
-      } catch (error) {
-        console.error('Failed to initialize player:', error);
-        
-        // If not authenticated, prompt user
-        if (error.message === 'not-authenticated') {
-          self.promptAuth();
-        }
-        throw error;
+      // If already initializing, wait for that to complete
+      if (self.playerInitPromise) {
+        return self.playerInitPromise;
       }
+
+      // Start initialization
+      self.playerInitPromise = (async () => {
+        try {
+          // Get access token
+          const token = await window.bspfyAuth.ensureAccessToken();
+          
+          // Wait for SDK to be ready
+          await self.waitForSpotifySDK();
+
+          // Get player config
+          const playerName = window.bspfyPublic?.player_name || 'BeTA iT Web Player';
+          const defaultVolume = window.bspfyPublic?.default_volume || 0.5;
+
+          // Create player
+          const player = new window.Spotify.Player({
+            name: playerName,
+            getOAuthToken: cb => {
+              window.bspfyAuth.ensureAccessToken()
+                .then(token => cb(token))
+                .catch(err => {
+                  console.error('Failed to get token:', err);
+                  cb('');
+                });
+            },
+            volume: defaultVolume
+          });
+
+          // Set up event listeners
+          player.addListener('ready', ({ device_id }) => {
+            console.log('Spotify player ready with Device ID', device_id);
+            player.device_id = device_id;
+          });
+
+          player.addListener('not_ready', ({ device_id }) => {
+            console.log('Device ID has gone offline', device_id);
+          });
+
+          player.addListener('player_state_changed', state => {
+            if (state) {
+              self.onPlayerStateChanged(state);
+            }
+          });
+
+          // Connect player
+          const connected = await player.connect();
+          if (!connected) {
+            throw new Error('Failed to connect Spotify player');
+          }
+
+          self.spotifyPlayer = player;
+          window.spotifyPlayer = player;
+
+          return player;
+        } catch (error) {
+          console.error('Failed to initialize player:', error);
+          self.playerInitPromise = null; // Reset so it can be retried
+          
+          // If not authenticated, prompt user
+          if (error.message === 'not-authenticated') {
+            self.promptAuth();
+          }
+          throw error;
+        }
+      })();
+
+      return self.playerInitPromise;
     },
 
     /**
@@ -272,7 +287,7 @@
 
         // Start playback via Spotify API
         if (player.device_id) {
-          await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${player.device_id}`, {
+          const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${player.device_id}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -283,10 +298,18 @@
             })
           });
 
+          if (!response.ok) {
+            throw new Error('Failed to start playback: ' + response.statusText);
+          }
+
           instance.isPlaying = true;
         }
       } catch (error) {
         console.error('Failed to play track:', error);
+        // Reset UI state on error
+        instance.isPlaying = false;
+        self.updatePlayButton(widgetId, false);
+        
         if (error.message === 'not-authenticated') {
           self.promptAuth();
         }
@@ -392,8 +415,10 @@
       instance.isPlaying = isPlaying;
       self.updatePlayButton(self.activeWidgetId, isPlaying);
 
-      // Handle track end - play next
-      if (state.position === 0 && state.paused && state.track_window.previous_tracks.length > 0) {
+      // Handle track end - check if track has changed to next
+      if (state.paused && state.track_window.next_tracks.length === 0 && 
+          state.duration > 0 && state.position >= state.duration - 1000) {
+        // Track ended, play next
         self.playNext(self.activeWidgetId);
       }
     },
@@ -409,8 +434,10 @@
 
       try {
         await window.bspfyAuth.startAuthPopup();
-        // Reload to initialize player with new auth
-        window.location.reload();
+        // Reinitialize player without reloading page
+        this.spotifyPlayer = null;
+        this.playerInitPromise = null;
+        await this.ensurePlayer();
       } catch (error) {
         console.error('Authentication failed:', error);
       }

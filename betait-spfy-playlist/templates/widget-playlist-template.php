@@ -46,16 +46,21 @@ $widget_id    = 'bspfy-widget-' . uniqid();
 			<div class="bspfy-player-artwork">
 				<?php
 				$first_track = $tracks[0];
-				$album_image = $first_track['album']['images'][0]['url'] ?? '';
+				$album_image = '';
+				if ( ! empty( $first_track['album']['images'] ) && is_array( $first_track['album']['images'] ) ) {
+					$album_image = $first_track['album']['images'][0]['url'] ?? '';
+				}
 				?>
-				<img 
-					src="<?php echo esc_url( $album_image ); ?>" 
-					alt="<?php echo esc_attr( $first_track['name'] ?? '' ); ?>"
-					class="bspfy-player-thumb"
-					id="<?php echo esc_attr( $widget_id ); ?>-artwork" />
+				<?php if ( $album_image ) : ?>
+					<img 
+						src="<?php echo esc_url( $album_image ); ?>" 
+						alt="<?php echo esc_attr( $first_track['name'] ?? '' ); ?>"
+						class="bspfy-player-thumb"
+						id="<?php echo esc_attr( $widget_id ); ?>-artwork" />
+				<?php endif; ?>
 			</div>
 			
-			<div class="bspfy-player-info">
+			<div class="bspfy-player-info" aria-live="polite" aria-atomic="true">
 				<div class="bspfy-player-track-name" id="<?php echo esc_attr( $widget_id ); ?>-track-name">
 					<?php echo esc_html( $first_track['name'] ?? '' ); ?>
 				</div>
@@ -122,7 +127,17 @@ $widget_id    = 'bspfy-widget-' . uniqid();
 					$duration_min   = floor( $duration_ms / 60000 );
 					$duration_sec   = floor( ( $duration_ms % 60000 ) / 1000 );
 					$duration_text  = sprintf( '%d:%02d', $duration_min, $duration_sec );
-					$album_image    = $track['album']['images'][2]['url'] ?? $track['album']['images'][0]['url'] ?? '';
+					$album_image    = '';
+					
+					if ( ! empty( $track['album']['images'] ) && is_array( $track['album']['images'] ) ) {
+						// Try smallest image first (index 2), fallback to largest.
+						if ( ! empty( $track['album']['images'][2]['url'] ) ) {
+							$album_image = $track['album']['images'][2]['url'];
+						} elseif ( ! empty( $track['album']['images'][0]['url'] ) ) {
+							$album_image = $track['album']['images'][0]['url'];
+						}
+					}
+					
 					$artist_names   = array();
 					
 					if ( ! empty( $track['artists'] ) && is_array( $track['artists'] ) ) {
@@ -174,11 +189,16 @@ $widget_id    = 'bspfy-widget-' . uniqid();
 	// Store track data for JavaScript (JSON-encoded, escaped for HTML attribute).
 	$tracks_data = array();
 	foreach ( $tracks as $track ) {
+		$album_image = '';
+		if ( ! empty( $track['album']['images'] ) && is_array( $track['album']['images'] ) ) {
+			$album_image = $track['album']['images'][0]['url'] ?? '';
+		}
+		
 		$tracks_data[] = array(
 			'uri'         => $track['uri'] ?? '',
 			'name'        => $track['name'] ?? '',
 			'artists'     => $track['artists'] ?? array(),
-			'album_image' => $track['album']['images'][0]['url'] ?? '',
+			'album_image' => $album_image,
 		);
 	}
 	?>
