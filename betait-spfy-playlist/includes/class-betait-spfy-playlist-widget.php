@@ -87,11 +87,19 @@ class Betait_Spfy_Playlist_Widget extends WP_Widget {
 			'all'
 		);
 
-		// Enqueue widget JS.
+		// Enqueue widget JS - ensure main plugin scripts are loaded first.
+		// The main plugin JS handle is 'betait-spfy-playlist', but we need to be more defensive.
+		$dependencies = array( 'jquery' );
+		
+		// Check if main plugin script is registered, add as dependency if it is.
+		if ( wp_script_is( 'betait-spfy-playlist', 'registered' ) || wp_script_is( 'betait-spfy-playlist', 'enqueued' ) ) {
+			$dependencies[] = 'betait-spfy-playlist';
+		}
+		
 		wp_enqueue_script(
 			'bspfy-widget',
 			plugin_dir_url( dirname( __FILE__ ) ) . 'public/js/betait-spfy-playlist-widget.js',
-			array( 'jquery', 'betait-spfy-playlist' ),
+			$dependencies,
 			$ver,
 			true
 		);

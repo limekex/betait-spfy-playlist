@@ -123,6 +123,7 @@ $widget_id    = 'bspfy-widget-' . uniqid();
 					$track_number   = $index + 1;
 					$track_name     = $track['name'] ?? '';
 					$track_uri      = $track['uri'] ?? '';
+					$track_id       = $track['id'] ?? '';
 					$duration_ms    = $track['duration_ms'] ?? 0;
 					$duration_min   = floor( $duration_ms / 60000 );
 					$duration_sec   = floor( ( $duration_ms % 60000 ) / 1000 );
@@ -139,6 +140,7 @@ $widget_id    = 'bspfy-widget-' . uniqid();
 					}
 					
 					$artist_names   = array();
+					$artist_ids     = array();
 					
 					if ( ! empty( $track['artists'] ) && is_array( $track['artists'] ) ) {
 						$artist_names = array_map(
@@ -147,15 +149,29 @@ $widget_id    = 'bspfy-widget-' . uniqid();
 							},
 							$track['artists']
 						);
+						$artist_ids = array_map(
+							function( $artist ) {
+								return $artist['id'] ?? '';
+							},
+							$track['artists']
+						);
 					}
+					
+					// Build Spotify URLs
+					$track_url  = $track_id ? 'https://open.spotify.com/track/' . $track_id : '';
+					$artist_url = ! empty( $artist_ids[0] ) ? 'https://open.spotify.com/artist/' . $artist_ids[0] : '';
+					$album_id   = $track['album']['id'] ?? '';
+					$album_url  = $album_id ? 'https://open.spotify.com/album/' . $album_id : '';
 					?>
 					<li class="bspfy-track-item" data-track-uri="<?php echo esc_attr( $track_uri ); ?>" data-track-index="<?php echo esc_attr( $index ); ?>">
 						<span class="bspfy-track-number"><?php echo esc_html( $track_number ); ?></span>
 						
+						<?php if ( $album_image ) : ?>
 						<img 
 							src="<?php echo esc_url( $album_image ); ?>" 
 							alt="<?php echo esc_attr( $track_name ); ?>"
 							class="bspfy-track-thumb" />
+						<?php endif; ?>
 						
 						<div class="bspfy-track-info">
 							<div class="bspfy-track-name"><?php echo esc_html( $track_name ); ?></div>
@@ -169,6 +185,25 @@ $widget_id    = 'bspfy-widget-' . uniqid();
 							data-track-index="<?php echo esc_attr( $index ); ?>">
 							<i class="fas fa-play"></i>
 						</button>
+						
+						<button type="button"
+								class="bspfy-track-more"
+								aria-haspopup="menu"
+								aria-expanded="false"
+								aria-label="<?php esc_attr_e( 'More actions', 'betait-spfy-playlist' ); ?>">
+							<i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
+						</button>
+						<div class="bspfy-track-more-menu" role="menu" hidden>
+							<?php if ( $artist_url ) : ?>
+								<a role="menuitem" class="bspfy-action-link" href="<?php echo esc_url( $artist_url ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'View artist', 'betait-spfy-playlist' ); ?></a>
+							<?php endif; ?>
+							<?php if ( $album_url ) : ?>
+								<a role="menuitem" class="bspfy-action-link" href="<?php echo esc_url( $album_url ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'View album', 'betait-spfy-playlist' ); ?></a>
+							<?php endif; ?>
+							<?php if ( $track_url ) : ?>
+								<a role="menuitem" class="bspfy-action-link" href="<?php echo esc_url( $track_url ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Open in Spotify', 'betait-spfy-playlist' ); ?></a>
+							<?php endif; ?>
+						</div>
 						
 						<span class="bspfy-track-duration"><?php echo esc_html( $duration_text ); ?></span>
 					</li>

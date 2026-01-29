@@ -10,9 +10,13 @@
    Widget Container
    =========================== */
 .bspfy-widget-playlist {
-	background: #fff;
-	border-radius: 8px;
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+	/* Glassmorphism effect */
+	background: rgba(255, 255, 255, 0.75);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+	border: 1px solid rgba(255, 255, 255, 0.3);
+	border-radius: 12px;
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 	padding: 1rem;
 	margin-bottom: 1.5rem;
 	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -232,17 +236,18 @@
 
 .bspfy-track-item {
 	display: grid;
-	grid-template-columns: 30px 40px 1fr auto 50px;
-	gap: 0.75rem;
+	grid-template-columns: 30px 35px 1fr auto 32px 50px;
+	gap: 0.5rem;
 	align-items: center;
-	padding: 0.5rem;
+	padding: 0.35rem 0.5rem;
 	border-radius: 4px;
 	transition: background-color 0.2s ease;
 	cursor: pointer;
+	position: relative;
 }
 
 .bspfy-track-item:hover {
-	background-color: #f5f5f5;
+	background-color: rgba(29, 185, 84, 0.05);
 }
 
 .bspfy-track-item.playing {
@@ -250,39 +255,63 @@
 }
 
 .bspfy-track-number {
-	font-size: 0.875rem;
+	font-size: 0.8125rem;
 	color: #666;
 	text-align: center;
 }
 
 .bspfy-track-thumb {
-	width: 40px;
-	height: 40px;
-	border-radius: 4px;
+	width: 35px;
+	height: 35px;
+	border-radius: 3px;
 	object-fit: cover;
 	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .bspfy-track-info {
 	overflow: hidden;
+	min-width: 0;
 }
 
 .bspfy-track-name {
-	font-size: 0.9375rem;
+	font-size: 0.875rem;
 	font-weight: 500;
 	color: #333;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	margin-bottom: 0.125rem;
+	transition: transform 0.3s ease;
+}
+
+/* Scrolling text on hover for long names */
+.bspfy-track-item:hover .bspfy-track-name {
+	animation: scroll-text 3s linear infinite;
+	animation-delay: 0.5s;
+}
+
+@keyframes scroll-text {
+	0%, 10% {
+		transform: translateX(0);
+	}
+	90%, 100% {
+		transform: translateX(calc(-100% + var(--visible-width, 100%)));
+	}
 }
 
 .bspfy-track-artist {
-	font-size: 0.8125rem;
+	font-size: 0.75rem;
 	color: #666;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+	transition: transform 0.3s ease;
+}
+
+/* Scrolling text on hover for long artist names */
+.bspfy-track-item:hover .bspfy-track-artist {
+	animation: scroll-text 3s linear infinite;
+	animation-delay: 0.5s;
 }
 
 .bspfy-track-play-btn {
@@ -325,6 +354,89 @@
 	font-size: 0.8125rem;
 	color: #666;
 	text-align: right;
+}
+
+/* ===========================
+   Meatball Menu (More Actions)
+   =========================== */
+.bspfy-track-more {
+	background: transparent;
+	border: none;
+	width: 32px;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	color: #666;
+	font-size: 1rem;
+	border-radius: 50%;
+	transition: all 0.2s ease;
+	outline: none;
+	opacity: 0;
+	position: relative;
+}
+
+.bspfy-track-item:hover .bspfy-track-more {
+	opacity: 1;
+}
+
+.bspfy-track-more:hover {
+	background: rgba(0, 0, 0, 0.05);
+	color: #333;
+}
+
+.bspfy-track-more:active {
+	transform: scale(0.95);
+}
+
+.bspfy-track-more:focus {
+	opacity: 1;
+	box-shadow: 0 0 0 3px rgba(29, 185, 84, 0.2);
+}
+
+.bspfy-track-more-menu {
+	position: absolute;
+	right: 0;
+	top: 100%;
+	margin-top: 0.25rem;
+	background: rgba(255, 255, 255, 0.95);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+	border: 1px solid rgba(0, 0, 0, 0.1);
+	border-radius: 8px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+	min-width: 160px;
+	z-index: 1000;
+	overflow: hidden;
+}
+
+.bspfy-track-more-menu[hidden] {
+	display: none;
+}
+
+.bspfy-track-more-menu .bspfy-action-link {
+	display: block;
+	padding: 0.75rem 1rem;
+	color: #333;
+	text-decoration: none;
+	font-size: 0.875rem;
+	transition: background-color 0.2s ease;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.bspfy-track-more-menu .bspfy-action-link:last-child {
+	border-bottom: none;
+}
+
+.bspfy-track-more-menu .bspfy-action-link:hover {
+	background-color: rgba(29, 185, 84, 0.1);
+	color: #1db954;
+}
+
+.bspfy-track-more-menu .bspfy-action-link:focus {
+	outline: 2px solid #1db954;
+	outline-offset: -2px;
 }
 
 /* ===========================
@@ -390,7 +502,7 @@
 	}
 	
 	.bspfy-track-item {
-		grid-template-columns: 30px 35px 1fr 40px;
+		grid-template-columns: 30px 35px 1fr 32px 32px;
 		gap: 0.5rem;
 	}
 	
@@ -402,11 +514,15 @@
 	.bspfy-track-duration {
 		display: none;
 	}
+	
+	.bspfy-track-more {
+		opacity: 1; /* Always visible on mobile */
+	}
 }
 
 @media (max-width: 480px) {
 	.bspfy-track-item {
-		grid-template-columns: 35px 1fr 40px;
+		grid-template-columns: 35px 1fr 32px 32px;
 		padding: 0.4rem;
 	}
 	
@@ -420,6 +536,10 @@
 	
 	.bspfy-track-artist {
 		font-size: 0.75rem;
+	}
+	
+	.bspfy-track-more {
+		opacity: 1; /* Always visible on mobile */
 	}
 }
 

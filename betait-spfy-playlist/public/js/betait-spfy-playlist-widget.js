@@ -86,17 +86,17 @@
 
       // Play/Pause button
       $widget.find('.bspfy-btn-play').on('click', function () {
-        self.togglePlayPause(widgetId);
+        self.checkAuthAndPlay(widgetId, () => self.togglePlayPause(widgetId));
       });
 
       // Previous button
       $widget.find('.bspfy-btn-prev').on('click', function () {
-        self.playPrevious(widgetId);
+        self.checkAuthAndPlay(widgetId, () => self.playPrevious(widgetId));
       });
 
       // Next button
       $widget.find('.bspfy-btn-next').on('click', function () {
-        self.playNext(widgetId);
+        self.checkAuthAndPlay(widgetId, () => self.playNext(widgetId));
       });
 
       // Volume control
@@ -104,20 +104,106 @@
         self.setVolume($(this).val() / 100);
       });
 
-      // Track item clicks
-      $widget.find('.bspfy-track-play-btn').on('click', function () {
+      // Track play button clicks
+      $widget.find('.bspfy-track-play-btn').on('click', function (e) {
+        e.stopPropagation(); // Don't trigger row click
         const trackIndex = parseInt($(this).data('track-index'), 10);
-        self.playTrack(widgetId, trackIndex);
+        self.checkAuthAndPlay(widgetId, () => self.playTrack(widgetId, trackIndex));
       });
 
-      // Track item row clicks
+      // Track item row clicks (excluding buttons and menus)
       $widget.find('.bspfy-track-item').on('click', function (e) {
-        // Don't trigger if clicking the button directly
-        if ($(e.target).closest('.bspfy-track-play-btn').length) return;
+        // Don't trigger if clicking buttons or menus
+        if ($(e.target).closest('.bspfy-track-play-btn, .bspfy-track-more, .bspfy-track-more-menu').length) {
+          return;
+        }
         
         const trackIndex = parseInt($(this).data('track-index'), 10);
-        self.playTrack(widgetId, trackIndex);
+        self.checkAuthAndPlay(widgetId, () => self.playTrack(widgetId, trackIndex));
       });
+
+      // Meatball menu toggle
+      $widget.find('.bspfy-track-more').on('click', function (e) {
+        e.stopPropagation();
+        const $btn = $(this);
+        const $menu = $btn.siblings('.bspfy-track-more-menu');
+        const isExpanded = $btn.attr('aria-expanded') === 'true';
+
+        // Close all other menus first
+        $widget.find('.bspfy-track-more').attr('aria-expanded', 'false');
+        $widget.find('.bspfy-track-more-menu').attr('hidden', '');
+
+        if (!isExpanded) {
+          $btn.attr('aria-expanded', 'true');
+          $menu.removeAttr('hidden');
+        }
+      });
+
+      // Close menus when clicking outside
+      $(document).on('click', function (e) {
+        if (!$(e.target).closest('.bspfy-track-item').length) {
+          $widget.find('.bspfy-track-more').attr('aria-expanded', 'false');
+          $widget.find('.bspfy-track-more-menu').attr('hidden', '');
+        }
+      });
+    },
+
+    /**
+     * Check authentication before playing
+     */
+    checkAuthAndPlay: async function (widgetId, playCallback) {
+      const self = this;
+
+      try {
+        // Check if bspfyAuth is available
+        if (!window.bspfyAuth || !window.bspfyAuth.ensureAccessToken) {
+          console.error('bspfyAuth not available');
+          self.showAuthRequired(widgetId);
+          return;
+        }
+
+        // Try to get access token
+        const token = await window.bspfyAuth.ensureAccessToken();
+        if (token) {
+          // User is authenticated, proceed with playback
+          playCallback();
+        } else {
+          // Not authenticated, show auth dialog
+          self.showAuthRequired(widgetId);
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        if (error.message === 'not-authenticated') {
+          self.showAuthRequired(widgetId);
+        } else {
+          console.error('Unexpected error:', error);
+        }
+      }
+    },
+
+    /**
+     * Show authentication required dialog
+     */
+    showAuthRequired: function (widgetId) {
+      const self = this;
+      
+      if (confirm('You need to authenticate with Spotify to play music. Would you like to sign in now?')) {
+        if (window.bspfyAuth && window.bspfyAuth.startAuthPopup) {
+          window.bspfyAuth.startAuthPopup()
+            .then(() => {
+              // Successfully authenticated, try to initialize player
+              self.spotifyPlayer = null;
+              self.playerInitPromise = null;
+              return self.ensurePlayer();
+            })
+            .catch((error) => {
+              console.error('Authentication failed:', error);
+              alert('Authentication was cancelled or failed. Please try again.');
+            });
+        } else {
+          alert('Authentication system is not available. Please refresh the page.');
+        }
+      }
     },
 
     /**
