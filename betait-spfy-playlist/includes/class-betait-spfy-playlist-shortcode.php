@@ -21,6 +21,8 @@ class Betait_Spfy_Playlist_Shortcode {
 	 */
 	public function __construct() {
 		add_shortcode( 'bspfy_playlist', array( $this, 'render_shortcode' ) );
+		// Add filter to clean up wpautop issues (runs after wpautop at priority 10).
+		add_filter( 'the_content', array( $this, 'fix_shortcode_wpautop' ), 20 );
 	}
 
 	/**
@@ -73,14 +75,40 @@ class Betait_Spfy_Playlist_Shortcode {
 
 		$output = ob_get_clean();
 		
-		// Remove any unwanted <p> and <br> tags added by wpautop().
-		// This prevents WordPress from auto-wrapping our content with paragraph tags.
-		$output = preg_replace( '/<p>\s*<\/p>/', '', $output ); // Remove empty <p></p> tags
-		$output = preg_replace( '/<p>\s+/', '<p>', $output ); // Remove whitespace after opening <p>
-		$output = preg_replace( '/\s+<\/p>/', '</p>', $output ); // Remove whitespace before closing </p>
-		$output = str_replace( array( '<p>', '</p>' ), '', $output ); // Remove remaining <p> tags
+		// Wrap output in special HTML comments to identify it for post-processing.
+		// The fix_shortcode_wpautop() filter will clean up wpautop issues.
+		return '<!--bspfy-start-->' . $output . '<!--bspfy-end-->';
+	}
+	
+	/**
+	 * Fix wpautop issues in shortcode output.
+	 * This filter runs AFTER wpautop (priority 20 vs wpautop's 10).
+	 * 
+	 * @param string $content The content after wpautop processing.
+	 * @return string Cleaned content.
+	 */
+	public function fix_shortcode_wpautop( $content ) {
+		// Only process if our shortcode markers are present.
+		if ( strpos( $content, '<!--bspfy-start-->' ) === false ) {
+			return $content;
+		}
 		
-		return $output;
+		// Match content between our markers and clean it up.
+		$pattern = '/<!--bspfy-start-->(.*?)<!--bspfy-end-->/s';
+		$content = preg_replace_callback( $pattern, function( $matches ) {
+			$output = $matches[1];
+			
+			// Remove unwanted <p> and <br> tags that wpautop added.
+			$output = preg_replace( '/<p>\s*<\/p>/', '', $output );          // Empty paragraphs
+			$output = preg_replace( '/<p>(\s*)<\/p>/', '', $output );        // Paragraphs with only whitespace
+			$output = preg_replace( '/<br\s*\/?\s*>/', '', $output );        // Line breaks
+			$output = preg_replace( '/<p>(\s*)/', '', $output );             // Opening <p> tags
+			$output = preg_replace( '/(\s*)<\/p>/', '', $output );           // Closing </p> tags
+			
+			return $output;
+		}, $content );
+		
+		return $content;
 	}
 
 	/**

@@ -171,7 +171,16 @@
         const token = await window.bspfyAuth.ensureAccessToken();
         if (token) {
           // User is authenticated, proceed with playback
-          playCallback();
+          try {
+            // Await the callback if it's async
+            await playCallback();
+          } catch (error) {
+            console.error('Playback callback failed:', error);
+            throw error;
+          } finally {
+            // Always hide loader after callback completes (success or error)
+            self.hideLoader(widgetId);
+          }
         } else {
           // Not authenticated, show auth dialog
           self.hideLoader(widgetId);
