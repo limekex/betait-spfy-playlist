@@ -66,7 +66,8 @@
           playlistId: playlistId,
           tracks: tracks,
           currentIndex: 0,
-          isPlaying: false
+          isPlaying: false,
+          isInitializing: false // Track if player is being initialized
         };
 
         // Bind events
@@ -155,9 +156,13 @@
       const self = this;
 
       try {
+        // Show loader
+        self.showLoader(widgetId);
+        
         // Check if bspfyAuth is available
         if (!window.bspfyAuth || !window.bspfyAuth.ensureAccessToken) {
           console.error('bspfyAuth not available');
+          self.hideLoader(widgetId);
           self.showAuthRequired(widgetId);
           return;
         }
@@ -169,10 +174,12 @@
           playCallback();
         } else {
           // Not authenticated, show auth dialog
+          self.hideLoader(widgetId);
           self.showAuthRequired(widgetId);
         }
       } catch (error) {
         console.error('Auth check failed:', error);
+        self.hideLoader(widgetId);
         if (error.message === 'not-authenticated') {
           self.showAuthRequired(widgetId);
         } else {
@@ -188,6 +195,7 @@
       const self = this;
       
       if (confirm('You need to authenticate with Spotify to play music. Would you like to sign in now?')) {
+        self.showLoader(widgetId);
         if (window.bspfyAuth && window.bspfyAuth.startAuthPopup) {
           window.bspfyAuth.startAuthPopup()
             .then(() => {
@@ -196,14 +204,41 @@
               self.playerInitPromise = null;
               return self.ensurePlayer();
             })
+            .then(() => {
+              self.hideLoader(widgetId);
+            })
             .catch((error) => {
               console.error('Authentication failed:', error);
+              self.hideLoader(widgetId);
               alert('Authentication was cancelled or failed. Please try again.');
             });
         } else {
+          self.hideLoader(widgetId);
           alert('Authentication system is not available. Please refresh the page.');
         }
       }
+    },
+
+    /**
+     * Show loading indicator
+     */
+    showLoader: function (widgetId) {
+      const instance = this.instances[widgetId];
+      if (!instance) return;
+      
+      const $loader = instance.$widget.find('.bspfy-widget-loader');
+      $loader.attr('aria-busy', 'true').fadeIn(200);
+    },
+
+    /**
+     * Hide loading indicator
+     */
+    hideLoader: function (widgetId) {
+      const instance = this.instances[widgetId];
+      if (!instance) return;
+      
+      const $loader = instance.$widget.find('.bspfy-widget-loader');
+      $loader.attr('aria-busy', 'false').fadeOut(200);
     },
 
     /**
@@ -330,19 +365,31 @@
       if (!instance) return;
 
       try {
+        // Prevent multiple simultaneous initializations
+        if (instance.isInitializing) {
+          console.log('Player is already initializing...');
+          return;
+        }
+        
         const player = await self.ensurePlayer();
         
-        if (instance.isPlaying) {
-          // Pause
+        // Get current player state
+        const state = await player.getCurrentState();
+        
+        if (state && !state.paused) {
+          // Music is playing, pause it
           await player.pause();
           instance.isPlaying = false;
           self.updatePlayButton(widgetId, false);
+          self.hideLoader(widgetId);
         } else {
-          // Play current track or start from beginning
+          // Music is paused or not started, play the track
+          // Always call playTrack to ensure proper initialization
           await self.playTrack(widgetId, instance.currentIndex);
         }
       } catch (error) {
         console.error('Playback error:', error);
+        self.hideLoader(widgetId);
         if (error.message === 'not-authenticated') {
           self.promptAuth();
         }
@@ -358,6 +405,7 @@
       if (!instance || !instance.tracks[trackIndex]) return;
 
       try {
+        instance.isInitializing = true;
         const player = await self.ensurePlayer();
         const track = instance.tracks[trackIndex];
         const token = await window.bspfyAuth.ensureAccessToken();
@@ -389,12 +437,16 @@
           }
 
           instance.isPlaying = true;
+          instance.isInitializing = false;
+          self.hideLoader(widgetId);
         }
       } catch (error) {
         console.error('Failed to play track:', error);
         // Reset UI state on error
         instance.isPlaying = false;
+        instance.isInitializing = false;
         self.updatePlayButton(widgetId, false);
+        self.hideLoader(widgetId);
         
         if (error.message === 'not-authenticated') {
           self.promptAuth();

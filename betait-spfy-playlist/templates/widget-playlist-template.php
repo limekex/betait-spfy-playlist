@@ -34,6 +34,11 @@ $widget_id    = 'bspfy-widget-' . uniqid();
 ?>
 
 <div class="bspfy-widget-playlist" data-playlist-id="<?php echo esc_attr( $playlist_id ); ?>" data-widget-id="<?php echo esc_attr( $widget_id ); ?>">
+	<!-- Loading indicator -->
+	<div class="bspfy-widget-loader" style="display: none;" aria-live="polite" aria-busy="false">
+		<div class="bspfy-loader-spinner"></div>
+		<div class="bspfy-loader-text"><?php esc_html_e( 'Loading...', 'betait-spfy-playlist' ); ?></div>
+	</div>
 	
 	<?php if ( $options['show_title'] ) : ?>
 		<div class="bspfy-widget-title">

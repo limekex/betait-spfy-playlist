@@ -71,7 +71,16 @@ class Betait_Spfy_Playlist_Shortcode {
 			include $template;
 		}
 
-		return ob_get_clean();
+		$output = ob_get_clean();
+		
+		// Remove any unwanted <p> and <br> tags added by wpautop().
+		// This prevents WordPress from auto-wrapping our content with paragraph tags.
+		$output = preg_replace( '/<p>\s*<\/p>/', '', $output ); // Remove empty <p></p> tags
+		$output = preg_replace( '/<p>\s+/', '<p>', $output ); // Remove whitespace after opening <p>
+		$output = preg_replace( '/\s+<\/p>/', '</p>', $output ); // Remove whitespace before closing </p>
+		$output = str_replace( array( '<p>', '</p>' ), '', $output ); // Remove remaining <p> tags
+		
+		return $output;
 	}
 
 	/**
