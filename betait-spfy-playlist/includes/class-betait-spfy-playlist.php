@@ -97,6 +97,10 @@ class Betait_Spfy_Playlist {
 		require_once $base . 'includes/class-betait-spfy-playlist-blocks.php';
 		require_once $base . 'includes/template-functions.php';
 
+		// Widget and shortcode.
+		require_once $base . 'includes/class-betait-spfy-playlist-widget.php';
+		require_once $base . 'includes/class-betait-spfy-playlist-shortcode.php';
+
 		// Public frontend.
 		require_once $base . 'public/class-betait-spfy-playlist-public.php';
 
@@ -173,6 +177,21 @@ class Betait_Spfy_Playlist {
 
 		// Optional: playlist single template override.
 		$this->loader->add_filter( 'template_include', $plugin_public, 'load_playlist_template' );
+
+		// Widget registration.
+		$this->loader->add_action( 'widgets_init', $this, 'register_widgets' );
+
+		// Shortcode handler.
+		new Betait_Spfy_Playlist_Shortcode();
+	}
+
+	/**
+	 * Register widgets.
+	 *
+	 * @return void
+	 */
+	public function register_widgets() {
+		register_widget( 'Betait_Spfy_Playlist_Widget' );
 	}
 
 	/**

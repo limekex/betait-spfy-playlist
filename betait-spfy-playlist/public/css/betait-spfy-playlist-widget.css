@@ -1,0 +1,618 @@
+/**
+ * Styles for Spotify Playlist Widget and Shortcode
+ * 
+ * @package    Betait_Spfy_Playlist
+ * @subpackage Betait_Spfy_Playlist/public/css
+ * @since      1.0.0
+ */
+
+/* ===========================
+   Widget Container
+   =========================== */
+.bspfy-widget-playlist {
+	position: relative; /* For loader positioning */
+	/* Glassmorphism effect */
+	background: rgba(255, 255, 255, 0.75);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+	border: 1px solid rgba(255, 255, 255, 0.3);
+	border-radius: 12px;
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+	padding: 1rem;
+	margin-bottom: 1.5rem;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+/* Removed .bspfy-shortcode-wrapper - widget and shortcode now use same HTML structure */
+
+/* ===========================
+   Loading Indicator
+   =========================== */
+.bspfy-widget-loader {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(255, 255, 255, 0.95);
+	backdrop-filter: blur(5px);
+	-webkit-backdrop-filter: blur(5px);
+	border-radius: 12px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	z-index: 1000;
+	gap: 1rem;
+}
+
+.bspfy-loader-spinner {
+	width: 40px;
+	height: 40px;
+	border: 4px solid rgba(29, 185, 84, 0.2);
+	border-top-color: #1db954;
+	border-radius: 50%;
+	animation: bspfy-spin 0.8s linear infinite;
+}
+
+@keyframes bspfy-spin {
+	to { transform: rotate(360deg); }
+}
+
+.bspfy-loader-text {
+	font-size: 0.875rem;
+	color: #1db954;
+	font-weight: 500;
+}
+
+/* ===========================
+   Widget Title
+   =========================== */
+.bspfy-widget-title h3 {
+	margin: 0 0 1rem 0;
+	font-size: 1.25rem;
+	font-weight: 600;
+	color: #1db954;
+	border-bottom: 2px solid #1db954;
+	padding-bottom: 0.5rem;
+}
+
+/* ===========================
+   Mini-Player
+   =========================== */
+.bspfy-widget-player {
+	display: grid;
+	grid-template-columns: 80px 1fr auto auto;
+	grid-template-rows: auto auto;
+	gap: 0.75rem;
+	align-items: center;
+	padding: 0.75rem;
+	background: linear-gradient(135deg, #1db954 0%, #1ed760 100%);
+	border-radius: 8px;
+	margin-bottom: 1rem;
+	max-height: 120px;
+	box-shadow: 0 4px 12px rgba(29, 185, 84, 0.2);
+}
+
+.bspfy-player-artwork {
+	grid-row: 1 / 3;
+	width: 80px;
+	height: 80px;
+	border-radius: 4px;
+	overflow: hidden;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.bspfy-player-thumb {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.bspfy-player-info {
+	grid-column: 2 / 3;
+	grid-row: 1 / 2;
+	overflow: hidden;
+}
+
+.bspfy-player-track-name {
+	font-size: 1rem;
+	font-weight: 600;
+	color: #fff;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	margin-bottom: 0.25rem;
+}
+
+.bspfy-player-artist-name {
+	font-size: 0.875rem;
+	color: rgba(255, 255, 255, 0.85);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.bspfy-player-controls {
+	grid-column: 2 / 3;
+	grid-row: 2 / 3;
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+}
+
+.bspfy-player-btn {
+	background: rgba(255, 255, 255, 0.2);
+	border: none;
+	border-radius: 50%;
+	width: 36px;
+	height: 36px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	color: #fff;
+	font-size: 0.875rem;
+	transition: all 0.2s ease;
+	outline: none;
+}
+
+.bspfy-player-btn:hover {
+	background: rgba(255, 255, 255, 0.3);
+	transform: scale(1.05);
+}
+
+.bspfy-player-btn:active {
+	transform: scale(0.95);
+}
+
+.bspfy-player-btn:focus {
+	box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.4);
+}
+
+.bspfy-btn-play {
+	width: 40px;
+	height: 40px;
+	font-size: 1rem;
+	background: #fff;
+	color: #1db954;
+}
+
+.bspfy-btn-play:hover {
+	background: #f0f0f0;
+	color: #1ed760;
+}
+
+.bspfy-player-btn.playing .fa-play {
+	display: none;
+}
+
+.bspfy-player-btn.playing .fa-pause {
+	display: inline;
+}
+
+.bspfy-player-btn .fa-pause {
+	display: none;
+}
+
+.bspfy-player-volume {
+	grid-column: 3 / 5;
+	grid-row: 1 / 3;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.bspfy-volume-btn {
+	background: transparent;
+	border: none;
+	color: #fff;
+	font-size: 1rem;
+	cursor: pointer;
+	padding: 0.5rem;
+	transition: opacity 0.2s ease;
+}
+
+.bspfy-volume-btn:hover {
+	opacity: 0.8;
+}
+
+.bspfy-volume-slider {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 80px;
+	height: 4px;
+	border-radius: 2px;
+	background: rgba(255, 255, 255, 0.3);
+	outline: none;
+	cursor: pointer;
+}
+
+.bspfy-volume-slider::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	background: #fff;
+	cursor: pointer;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+	transition: transform 0.2s ease;
+}
+
+.bspfy-volume-slider::-webkit-slider-thumb:hover {
+	transform: scale(1.2);
+}
+
+.bspfy-volume-slider::-moz-range-thumb {
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	background: #fff;
+	cursor: pointer;
+	border: none;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+	transition: transform 0.2s ease;
+}
+
+.bspfy-volume-slider::-moz-range-thumb:hover {
+	transform: scale(1.2);
+}
+
+/* ===========================
+   Track List
+   =========================== */
+.bspfy-widget-tracks {
+	margin-top: 1rem;
+}
+
+.bspfy-track-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.bspfy-track-item {
+	display: grid !important;
+	grid-template-columns: 35px 1fr auto 32px 50px;
+	gap: 0.5rem;
+	align-items: center;
+	padding: 0.35rem 0.5rem !important;
+	border-radius: 4px;
+	transition: background-color 0.2s ease;
+	cursor: pointer;
+	position: relative;
+}
+
+.bspfy-track-item:hover {
+	background-color: rgba(29, 185, 84, 0.05);
+}
+
+.bspfy-track-item.playing {
+	background-color: rgba(29, 185, 84, 0.1);
+}
+
+/* Track number removed - not needed in widget/shortcode display */
+
+.bspfy-track-thumb {
+	width: 35px;
+	height: 35px;
+	border-radius: 3px;
+	object-fit: cover;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.bspfy-track-info {
+	overflow: hidden;
+	min-width: 0;
+}
+
+.bspfy-track-name {
+	font-size: 0.875rem;
+	font-weight: 500;
+	color: #333;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	margin-bottom: 0.125rem;
+	transition: transform 0.3s ease;
+}
+
+/* Scrolling text on hover for long names */
+.bspfy-track-item:hover .bspfy-track-name {
+	animation: scroll-text 3s linear infinite;
+	animation-delay: 0.5s;
+}
+
+@keyframes scroll-text {
+	0%, 10% {
+		transform: translateX(0);
+	}
+	90%, 100% {
+		transform: translateX(calc(-100% + var(--visible-width, 100%)));
+	}
+}
+
+.bspfy-track-artist {
+	font-size: 0.75rem;
+	color: #666;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	transition: transform 0.3s ease;
+}
+
+/* Scrolling text on hover for long artist names */
+.bspfy-track-item:hover .bspfy-track-artist {
+	animation: scroll-text 3s linear infinite;
+	animation-delay: 0.5s;
+}
+
+.bspfy-track-play-btn {
+	background: transparent;
+	border: 1px solid #1db954;
+	border-radius: 50%;
+	width: 32px;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	color: #1db954;
+	font-size: 0.75rem;
+	transition: all 0.2s ease;
+	outline: none;
+	opacity: 0;
+}
+
+.bspfy-track-item:hover .bspfy-track-play-btn {
+	opacity: 1;
+}
+
+.bspfy-track-play-btn:hover {
+	background: #1db954;
+	color: #fff;
+	transform: scale(1.1);
+}
+
+.bspfy-track-play-btn:active {
+	transform: scale(0.95);
+}
+
+.bspfy-track-play-btn:focus {
+	opacity: 1;
+	box-shadow: 0 0 0 3px rgba(29, 185, 84, 0.2);
+}
+
+.bspfy-track-duration {
+	font-size: 0.8125rem;
+	color: #666;
+	text-align: right;
+}
+
+/* ===========================
+   Meatball Menu (More Actions)
+   =========================== */
+.bspfy-track-more {
+	background: transparent;
+	border: none;
+	width: 32px;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	color: #666;
+	font-size: 1rem;
+	border-radius: 50%;
+	transition: all 0.2s ease;
+	outline: none;
+	opacity: 0.3; /* Make slightly visible by default so users can discover it */
+	position: relative;
+}
+
+.bspfy-track-item:hover .bspfy-track-more {
+	opacity: 1;
+}
+
+/* In widget sidebars, make menu more visible since hover may be less intuitive */
+.widget .bspfy-track-more,
+aside .bspfy-track-more {
+	opacity: 0.5; /* More visible in sidebars */
+}
+
+.widget .bspfy-track-item:hover .bspfy-track-more,
+aside .bspfy-track-item:hover .bspfy-track-more {
+	opacity: 1;
+}
+
+.bspfy-track-more:hover {
+	background: rgba(0, 0, 0, 0.05);
+	color: #333;
+}
+
+.bspfy-track-more:active {
+	transform: scale(0.95);
+}
+
+.bspfy-track-more:focus {
+	opacity: 1;
+	box-shadow: 0 0 0 3px rgba(29, 185, 84, 0.2);
+}
+
+.bspfy-track-more-menu {
+	position: absolute;
+	right: 0;
+	top: 100%;
+	margin-top: 0.25rem;
+	background: rgba(255, 255, 255, 0.95);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+	border: 1px solid rgba(0, 0, 0, 0.1);
+	border-radius: 8px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+	min-width: 160px;
+	z-index: 1000;
+	overflow: hidden;
+}
+
+/* In narrow widget sidebars, adjust menu width to fit */
+.widget .bspfy-track-more-menu,
+aside .bspfy-track-more-menu {
+	min-width: 140px; /* Slightly narrower for sidebars */
+	right: -8px; /* Offset slightly to prevent clipping */
+}
+
+.bspfy-track-more-menu[hidden] {
+	display: none;
+}
+
+.bspfy-track-more-menu .bspfy-action-link {
+	display: block !important;
+	padding: 0.75rem 1rem !important;
+	color: #333;
+	text-decoration: none !important;
+	font-size: 0.875rem;
+	transition: background-color 0.2s ease;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.bspfy-track-more-menu .bspfy-action-link:last-child {
+	border-bottom: none;
+}
+
+.bspfy-track-more-menu .bspfy-action-link:hover {
+	background-color: rgba(29, 185, 84, 0.1);
+	color: #1db954;
+}
+
+.bspfy-track-more-menu .bspfy-action-link:focus {
+	outline: 2px solid #1db954;
+	outline-offset: -2px;
+}
+
+/* ===========================
+   Footer Link
+   =========================== */
+.bspfy-widget-footer {
+	margin-top: 1rem;
+	padding-top: 1rem;
+	border-top: 1px solid #e0e0e0;
+	text-align: center;
+}
+
+.bspfy-playlist-link {
+	display: inline-block;
+	color: #1db954;
+	text-decoration: none;
+	font-size: 0.9375rem;
+	font-weight: 500;
+	transition: color 0.2s ease;
+	padding: 0.5rem 1rem;
+	border-radius: 4px;
+}
+
+.bspfy-playlist-link:hover {
+	color: #1ed760;
+	background-color: rgba(29, 185, 84, 0.05);
+}
+
+/* ===========================
+   Responsive Design
+   =========================== */
+@media (max-width: 768px) {
+	.bspfy-widget-player {
+		grid-template-columns: 60px 1fr;
+		grid-template-rows: auto auto auto;
+		gap: 0.5rem;
+	}
+	
+	.bspfy-player-artwork {
+		width: 60px;
+		height: 60px;
+	}
+	
+	.bspfy-player-info {
+		grid-column: 2 / 3;
+		grid-row: 1 / 2;
+	}
+	
+	.bspfy-player-controls {
+		grid-column: 1 / 3;
+		grid-row: 2 / 3;
+		justify-content: center;
+	}
+	
+	.bspfy-player-volume {
+		grid-column: 1 / 3;
+		grid-row: 3 / 4;
+		justify-content: center;
+	}
+	
+	.bspfy-volume-slider {
+		width: 120px;
+	}
+	
+	.bspfy-track-item {
+		grid-template-columns: 35px 1fr 32px 32px;
+		gap: 0.5rem;
+	}
+	
+	.bspfy-track-thumb {
+		width: 35px;
+		height: 35px;
+	}
+	
+	.bspfy-track-duration {
+		display: none;
+	}
+	
+	.bspfy-track-more {
+		opacity: 1; /* Always visible on mobile */
+	}
+}
+
+@media (max-width: 480px) {
+	.bspfy-track-item {
+		grid-template-columns: 35px 1fr 32px 32px;
+		padding: 0.4rem;
+	}
+	
+	.bspfy-track-name {
+		font-size: 0.875rem;
+	}
+	
+	.bspfy-track-artist {
+		font-size: 0.75rem;
+	}
+	
+	.bspfy-track-more {
+		opacity: 1; /* Always visible on mobile */
+	}
+}
+
+/* ===========================
+   Accessibility
+   =========================== */
+.bspfy-player-btn:focus-visible,
+.bspfy-track-play-btn:focus-visible,
+.bspfy-volume-slider:focus-visible {
+	outline: 3px solid #1db954;
+	outline-offset: 2px;
+}
+
+/* Screen reader only */
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border-width: 0;
+}

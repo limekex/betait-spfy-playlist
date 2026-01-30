@@ -16,6 +16,7 @@ This repo includes:
 * Secure **OAuth 2.0 PKCE** via WP REST endpoints under `/wp-json/bspfy/v1/oauth/*`.
 * **httpOnly** cookie token storage (configurable SameSite/Secure).
 * **Web Playback SDK** for in-browser playback *(Spotify Premium required for end users)*.
+* **Widget & Shortcode Support** – Display playlists anywhere on your site with an integrated mini-player.
 * **Save to Spotify** – Allow visitors to save playlists to their own Spotify accounts with customizable branding.
 * **WPML Compatible** – Full translation support for playlist content while preserving Spotify metadata (see [WPML_TRANSLATION.md](betait-spfy-playlist/WPML_TRANSLATION.md)).
 * Role/membership gate via `bspfy_can_play` filter.
@@ -42,6 +43,45 @@ If you fork/rename the plugin, update identifiers accordingly (examples):
    define('BSPFY_STRICT_SAMESITE', true);
    define('BSPFY_REQUIRE_PREMIUM', true);
 3. Place a connect/play UI in your theme/admin as needed; the client helper is available via `window.bspfyAuth`.
+
+## Usage
+
+### Widget
+
+Add the **Spotify Playlist** widget to any sidebar or widget area:
+
+1. Navigate to **Appearance > Widgets** (or use the Block Editor).
+2. Add the **Spotify Playlist** widget to your desired sidebar.
+3. Configure the widget:
+   - Select a playlist from the dropdown
+   - Toggle display options (title, player, tracks, footer link)
+   - Set track limit (0 = show all tracks)
+
+### Shortcode
+
+Display a playlist anywhere in your content using the `[bspfy_playlist]` shortcode:
+
+```
+[bspfy_playlist id="123" show_title="yes" show_player="yes" show_tracks="yes" show_footer="yes" limit="10"]
+```
+
+**Attributes:**
+- `id` (required) – Playlist post ID
+- `show_title` (optional, default: "yes") – Display playlist title
+- `show_player` (optional, default: "yes") – Display mini-player
+- `show_tracks` (optional, default: "yes") – Display track list
+- `show_footer` (optional, default: "yes") – Display "See Playlist" link
+- `limit` (optional, default: 0 = all) – Limit number of tracks displayed
+
+### Mini-Player Features
+
+The integrated mini-player includes:
+- Current track artwork and info
+- Play/Pause controls
+- Previous/Next track navigation
+- Volume control
+- Responsive design (adapts to mobile screens)
+- Full keyboard accessibility
 
 ## Recommended Tools
 
