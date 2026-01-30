@@ -122,6 +122,11 @@ class Betait_Spfy_Playlist_Shortcode {
 		// Remove the marker comments themselves.
 		$content = str_replace( array( '<!--bspfy-start-->', '<!--bspfy-end-->' ), '', $content );
 		
+		// Final cleanup: Remove any <p> tags that wrap the widget container.
+		// After removing markers, wpautop may have left <p> tags around the div.
+		$content = preg_replace( '/<p>\s*(<div class="bspfy-widget-playlist")/', '$1', $content );
+		$content = preg_replace( '/(<\/div>)\s*<\/p>(\s*)$/', '$1$2', $content );
+		
 		return $content;
 	}
 

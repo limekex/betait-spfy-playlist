@@ -469,13 +469,15 @@ aside .bspfy-track-more-menu {
 }
 
 .bspfy-track-more-menu .bspfy-action-link {
-	display: block;
-	padding: 0.75rem 1rem;
+	display: block !important;
+	padding: 0.75rem 1rem !important;
 	color: #333;
-	text-decoration: none;
+	text-decoration: none !important;
 	font-size: 0.875rem;
 	transition: background-color 0.2s ease;
 	border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+	width: 100%;
+	box-sizing: border-box;
 }
 
 .bspfy-track-more-menu .bspfy-action-link:last-child {
