@@ -471,17 +471,17 @@ aside .bspfy-track-more-menu {
 .bspfy-track-more-menu .bspfy-action-link {
 	display: block !important;
 	padding: 0.75rem 1rem !important;
-	color: #333;
+	color: #333 !important;
 	text-decoration: none !important;
-	font-size: 0.875rem;
-	transition: background-color 0.2s ease;
-	border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-	width: 100%;
-	box-sizing: border-box;
+	font-size: 0.875rem !important;
+	transition: background-color 0.2s ease !important;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+	width: 100% !important;
+	box-sizing: border-box !important;
 }
 
 .bspfy-track-more-menu .bspfy-action-link:last-child {
-	border-bottom: none;
+	border-bottom: none !important;
 }
 
 .bspfy-track-more-menu .bspfy-action-link:hover {
